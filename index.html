@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Jumping Pegs - Mathematical Puzzle Game</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js r128 CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- OrbitControls CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;600&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at center, #12161f 0%, #0a0c10 100%);
+      color: #f8fafc;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .font-mono-code {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Glassmorphism styling */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .glass-button {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-button:hover:not(:disabled) {
+      background: rgba(51, 65, 85, 0.85);
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
+    }
+    .glass-button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    /* Custom neon glows */
+    .glow-cyan {
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    }
+    .glow-amber {
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+    }
+
+    /* Canvas overlay */
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+
+    /* Target pillar animation pulse in UI */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .animate-pulse-ring {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="relative h-full w-full overflow-hidden select-none">
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Main Game UI Layer -->
+  <div class="relative z-10 flex flex-col justify-between h-full p-4 md:p-6 pointer-events-none">
+
+    <!-- Top HUD Header -->
+    <header class="flex flex-wrap items-center justify-between gap-4 pointer-events-auto">
+      <!-- Title & Level Info -->
+      <div class="glass-panel px-5 py-3 rounded-2xl flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-lg shadow-lg glow-cyan">
+          <span id="level-num">1</span>
+        </div>
+        <div>
+          <h1 id="level-name" class="text-lg font-bold text-white tracking-wide">The First Hop</h1>
+          <p id="level-desc" class="text-xs text-slate-400">Jump Peg A over Peg B to reach the target.</p>
+        </div>
+      </div>
+
+      <!-- Stats & Badges -->
+      <div class="glass-panel px-5 py-3 rounded-2xl flex items-center gap-6 text-sm font-medium">
+        <!-- Target Badge -->
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
+          <span class="text-slate-400">Target:</span>
+          <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">(2, 0)</span>
+        </div>
+        <div class="h-4 w-px bg-slate-700"></div>
+        <!-- Moves Counter -->
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">Moves:</span>
+          <span id="moves-count" class="font-mono-code text-cyan-300 font-bold">0</span>
+          <span class="text-slate-500 text-xs">/ Par <span id="par-moves">1</span></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Center Aiming / Level Status Overlay (Dynamic tooltip) -->
+    <div id="hint-toast" class="self-center glass-panel px-4 py-2 rounded-full text-xs font-medium text-slate-300 transition-all opacity-90 pointer-events-auto flex items-center gap-2 shadow-lg">
+      <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 10 11-18 0 9 9 0 0118 0z"></path></svg>
+      <span id="hint-text">Click a peg to activate reflection jump trajectories.</span>
+    </div>
+
+    <!-- Bottom Controls Footer -->
+    <footer class="flex flex-wrap items-center justify-between gap-4 pointer-events-auto">
+      <!-- Left utilities -->
+      <div class="flex items-center gap-2">
+        <button id="btn-levels" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="Select Level">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+          Levels
+        </button>
+        <button id="btn-how-to" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="How to Play">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 10 11-18 0 9 9 0 0118 0z"></path></svg>
+          How to Play
+        </button>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex items-center gap-2">
+        <button id="btn-undo" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="Undo Move (Ctrl+Z)">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+          Undo <span class="text-[10px] text-slate-500 font-mono">Ctrl+Z</span>
+        </button>
+        <button id="btn-restart" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="Restart Level (R)">
+          <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Reset <span class="text-[10px] text-slate-500 font-mono">R</span>
+        </button>
+        <button id="btn-cam-reset" class="glass-button p-2.5 rounded-xl text-slate-300" title="Reset Camera View">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+        </button>
+        <button id="btn-mute" class="glass-button p-2.5 rounded-xl text-slate-300" title="Toggle Sound">
+          <svg id="icon-sound-on" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+          <svg id="icon-sound-off" class="w-4 h-4 text-rose-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Level Select Modal -->
+  <div id="modal-levels" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-300">
+    <div class="glass-panel w-full max-w-2xl rounded-3xl p-6 md:p-8 relative border border-slate-700/50 shadow-2xl">
+      <button id="btn-close-levels" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <h2 class="text-2xl font-bold text-white mb-1 flex items-center gap-3">
+        <span class="text-cyan-400">❖</span> Select Level
+      </h2>
+      <p class="text-sm text-slate-400 mb-6">Choose a puzzle level to solve. Track your par efficiency.</p>
+
+      <div id="levels-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+        <!-- Dynamic Level Cards -->
+      </div>
+    </div>
+  </div>
+
+  <!-- How To Play Modal -->
+  <div id="modal-how-to" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-300">
+    <div class="glass-panel w-full max-w-xl rounded-3xl p-6 md:p-8 relative border border-slate-700/50 shadow-2xl">
+      <button id="btn-close-how-to" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+        <span class="text-emerald-400">💡</span> How to Play
+      </h2>
+      <p class="text-xs text-slate-400 mb-6">Mathematical Point-Reflection Puzzle Rules</p>
+
+      <div class="space-y-4 text-sm text-slate-300">
+        <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex items-start gap-4">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-bold flex items-center justify-center shrink-0">1</div>
+          <div>
+            <h3 class="font-semibold text-white mb-1">Point Reflection Formula</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              When Peg <span class="font-mono text-cyan-300">A (x_A, y_A)</span> jumps over Pivot Peg <span class="font-mono text-amber-300">B (x_B, y_B)</span>, it lands exactly at:
+            </p>
+            <div class="font-mono-code text-center my-2 text-cyan-400 text-xs bg-slate-950/80 py-2 rounded-lg border border-cyan-500/20">
+              Destination C = (2x_B - x_A, 2y_B - y_A)
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex items-start gap-4">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center shrink-0">2</div>
+          <div>
+            <h3 class="font-semibold text-white mb-1">No Peg Elimination</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Unlike classic Checkers or Solitaire, jumped pegs <strong class="text-slate-200">do not disappear</strong>! They remain on the board as pivotal reflection stepping stones for future jumps.
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex items-start gap-4">
+          <div class="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-400 font-bold flex items-center justify-center shrink-0">3</div>
+          <div>
+            <h3 class="font-semibold text-white mb-1">Goal Objective</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Move <strong class="text-emerald-400">ANY peg</strong> onto the glowing green laser energy pillar target hole in as few moves as possible to win!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level Complete Modal -->
+  <div id="modal-complete" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden transition-opacity duration-300">
+    <div class="glass-panel w-full max-w-md rounded-3xl p-8 text-center relative border border-emerald-500/30 shadow-2xl glow-emerald">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-3xl shadow-lg">
+        🎉
+      </div>
+      <h2 class="text-2xl font-bold text-white mb-1">Level Complete!</h2>
+      <p id="complete-level-title" class="text-sm text-cyan-400 font-medium mb-4">Level 1: The First Hop</p>
+
+      <!-- Stars rating -->
+      <div id="complete-stars" class="flex justify-center gap-2 mb-6 text-3xl">
+        <span class="text-amber-400 filter drop-shadow">★</span>
+        <span class="text-amber-400 filter drop-shadow">★</span>
+        <span class="text-amber-400 filter drop-shadow">★</span>
+      </div>
+
+      <!-- Stats Summary -->
+      <div class="bg-slate-900/70 rounded-2xl p-4 mb-6 border border-slate-800 text-xs flex justify-around">
+        <div>
+          <span class="block text-slate-400 mb-1">Your Moves</span>
+          <span id="complete-moves" class="font-mono text-lg font-bold text-cyan-400">1</span>
+        </div>
+        <div class="w-px bg-slate-800"></div>
+        <div>
+          <span class="block text-slate-400 mb-1">Par Target</span>
+          <span id="complete-par" class="font-mono text-lg font-bold text-slate-300">1</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button id="btn-replay" class="glass-button flex-1 py-3 rounded-xl text-xs font-semibold text-slate-200">
+          Replay
+        </button>
+        <button id="btn-next-level" class="flex-1 py-3 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold shadow-lg transition-all transform hover:-translate-y-0.5">
+          Next Level →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. DATASETS & GAME STATE SCHEMA ---
+    const LEVELS = [
+      {
+        id: 1,
+        name: "The First Hop",
+        difficulty: "Tutorial",
+        description: "Jump Peg A over Peg B to reach the green target hole.",
+        parMoves: 1,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 }
+        ],
+        target: { x: 2, y: 0 },
+        cameraPos: { x: 1, y: 8, z: 6 }
+      },
+      {
+        id: 2,
+        name: "Linear Relay",
+        difficulty: "Easy",
+        description: "Chain jumps in a straight line to reach distant coordinates.",
+        parMoves: 2,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 },
+          { id: 'p3', x: 2, y: 0 }
+        ],
+        target: { x: 4, y: 0 },
+        cameraPos: { x: 2, y: 10, z: 8 }
+      },
+      {
+        id: 3,
+        name: "Diagonal Inversion",
+        difficulty: "Medium",
+        description: "Use 2D diagonal reflection to shift axes and hit the goal.",
+        parMoves: 2,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 1 },
+          { id: 'p3', x: 0, y: 2 }
+        ],
+        target: { x: 2, y: 2 },
+        cameraPos: { x: 1, y: 10, z: 8 }
+      },
+      {
+        id: 4,
+        name: "Stepping Stones",
+        difficulty: "Medium-Hard",
+        description: "Bounce pegs back and forth to create a bridge across the board.",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 },
+          { id: 'p3', x: 0, y: 1 }
+        ],
+        target: { x: 2, y: 2 },
+        cameraPos: { x: 1, y: 11, z: 9 }
+      },
+      {
+        id: 5,
+        name: "The Parity Lock",
+        difficulty: "Hard",
+        description: "Navigate a complex 3-peg cluster to reach the target parity spot.",
+        parMoves: 4,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 2, y: 0 },
+          { id: 'p3', x: 1, y: 2 }
+        ],
+        target: { x: 3, y: 4 },
+        cameraPos: { x: 2, y: 14, z: 12 }
+      }
+    ];
+
+    const GRID_BOUNDS = 15; // Playable bounds [-15, 15]
+
+    const GameState = {
+      currentLevel: 1,
+      movesCount: 0,
+      history: [], // Array of snapshots: [{ id, x, y }]
+      pegs: [], // [{ id, x, y, mesh }]
+      target: { x: 2, y: 0 },
+      isAnimating: false,
+      selectedPeg: null,
+      validMoves: [], // [{ pivot: pegObj, dest: {x, y} }]
+      soundMuted: false,
+      bestScores: JSON.parse(localStorage.getItem('3d_pegs_best') || '{}')
+    };
+
+    // --- 2. MATHEMATICAL CORE & POINT REFLECTION MATH ---
+    /**
+     * Point Reflection Formula: C = 2B - A
+     * x_C = 2 * x_B - x_A
+     * y_C = 2 * y_B - y_A
+     */
+    function calculateReflection(pegA, pivotB) {
+      return {
+        x: 2 * pivotB.x - pegA.x,
+        y: 2 * pivotB.y - pegA.y
+      };
+    }
+
+    /**
+     * Checks if coordinate (x, y) is occupied by any peg in list.
+     */
+    function isOccupied(x, y, pegsList) {
+      return pegsList.some(p => p.x === x && p.y === y);
+    }
+
+    /**
+     * Checks if coordinate (x, y) is within bounds.
+     */
+    function isWithinBounds(x, y) {
+      return Math.abs(x) <= GRID_BOUNDS && Math.abs(y) <= GRID_BOUNDS;
+    }
+
+    /**
+     * Calculates all valid destination positions for a given peg A.
+     * Returns array of objects: { pivot: pegB, dest: {x, y} }
+     */
+    function getValidMovesForPeg(pegA, pegsList) {
+      const validMoves = [];
+      for (const pivotB of pegsList) {
+        if (pivotB.id === pegA.id) continue;
+
+        const dest = calculateReflection(pegA, pivotB);
+
+        // Check if destination is within grid bounds and NOT occupied
+        if (isWithinBounds(dest.x, dest.y) && !isOccupied(dest.x, dest.y, pegsList)) {
+          validMoves.push({
+            pivot: pivotB,
+            dest: dest
+          });
+        }
+      }
+      return validMoves;
+    }
+
+    /**
+     * Checks win condition: is any peg currently at the target coordinate?
+     */
+    function checkWinCondition() {
+      return GameState.pegs.some(p => p.x === GameState.target.x && p.y === GameState.target.y);
+    }
+
+    /**
+     * Save snapshot of peg positions to history array for Undo.
+     */
+    function saveHistorySnapshot() {
+      const snapshot = GameState.pegs.map(p => ({ id: p.id, x: p.x, y: p.y }));
+      GameState.history.push(snapshot);
+    }
+
+    // --- 3. PROCEDURAL WEB AUDIO API SYNTHESIZER ---
+    let audioCtx = null;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playSoundSelect() {
+      if (GameState.soundMuted) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08); // A5
+
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function playSoundJump() {
+      if (GameState.soundMuted) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4
+      osc.frequency.exponentialRampToValueAtTime(659.25, audioCtx.currentTime + 0.25); // E5
+
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    }
+
+    function playSoundLanding() {
+      if (GameState.soundMuted) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.12);
+
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    }
+
+    function playSoundWin() {
+      if (GameState.soundMuted) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, index) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.09);
+
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + index * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + index * 0.09 + 0.4);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + index * 0.09);
+        osc.stop(audioCtx.currentTime + index * 0.09 + 0.4);
+      });
+    }
+
+    function playSoundError() {
+      if (GameState.soundMuted) return;
+      initAudioContext();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(90, audioCtx.currentTime + 0.15);
+
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    }
+
+    function toggleMute() {
+      GameState.soundMuted = !GameState.soundMuted;
+      document.getElementById('icon-sound-on').classList.toggle('hidden', GameState.soundMuted);
+      document.getElementById('icon-sound-off').classList.toggle('hidden', !GameState.soundMuted);
+    }
+
+    // --- 4. THREE.JS 3D SCENE & GEOMETRY BUILDERS ---
+    let scene, camera, renderer, controls;
+    let groundGridGroup, pegsGroup, targetGroup, previewGroup;
+    let hoverMesh = null;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Shared Materials & Geometries
+    let pegGeometryBase, pegGeometryHead, porcelainMaterial, pegSelectedMaterial;
+    let targetPillarMesh, targetRingMesh;
+
+    function init3DScene() {
+      const container = document.getElementById('canvas-container');
+
+      // Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0c10);
+      scene.fog = new THREE.FogExp2(0x0a0c10, 0.025);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(1, 10, 8);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+      container.appendChild(renderer.domElement);
+
+      // OrbitControls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below ground
+      controls.minDistance = 3;
+      controls.maxDistance = 35;
+
+      // Groups
+      groundGridGroup = new THREE.Group();
+      pegsGroup = new THREE.Group();
+      targetGroup = new THREE.Group();
+      previewGroup = new THREE.Group();
+
+      scene.add(groundGridGroup);
+      scene.add(pegsGroup);
+      scene.add(targetGroup);
+      scene.add(previewGroup);
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(12, 20, 10);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 50;
+      const shadowCamSize = 18;
+      dirLight.shadow.camera.left = -shadowCamSize;
+      dirLight.shadow.camera.right = shadowCamSize;
+      dirLight.shadow.camera.top = shadowCamSize;
+      dirLight.shadow.camera.bottom = -shadowCamSize;
+      dirLight.shadow.bias = -0.0005;
+      scene.add(dirLight);
+
+      const blueRimLight = new THREE.DirectionalLight(0x38bdf8, 0.4);
+      blueRimLight.position.set(-10, 15, -10);
+      scene.add(blueRimLight);
+
+      // Build Ground Board
+      createGroundGrid();
+
+      // Setup Shared Peg Materials & Geometries
+      setupPegMaterials();
+
+      // Create Target Marker Beam
+      createTargetMarker();
+
+      // Window Resize Listener
+      window.addEventListener('resize', onWindowResize, false);
+    }
+
+    /**
+     * Creates infinite-looking ground plane with subtle dimple holes at grid integer coordinates.
+     */
+    function createGroundGrid() {
+      // Main dark ground plane
+      const planeGeo = new THREE.PlaneGeometry(80, 80);
+      const planeMat = new THREE.MeshStandardMaterial({
+        color: 0x0f141d,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      const groundMesh = new THREE.Mesh(planeGeo, planeMat);
+      groundMesh.rotation.x = -Math.PI / 2;
+      groundMesh.position.y = -0.01;
+      groundMesh.receiveShadow = true;
+      groundGridGroup.add(groundMesh);
+
+      // Hole dimples at integer grid points
+      const holeGeo = new THREE.CircleGeometry(0.18, 24);
+      const holeMat = new THREE.MeshStandardMaterial({
+        color: 0x07090e,
+        roughness: 0.9,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+
+      const ringGeo = new THREE.RingGeometry(0.18, 0.21, 24);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x1e293b,
+        side: THREE.DoubleSide
+      });
+
+      // Grid lines
+      const gridHelper = new THREE.GridHelper(30, 30, 0x334155, 0x1e293b);
+      gridHelper.position.y = 0.001;
+      groundGridGroup.add(gridHelper);
+
+      // Hole dimples instanced/placed
+      const range = 12;
+      for (let x = -range; x <= range; x++) {
+        for (let z = -range; z <= range; z++) {
+          const holeMesh = new THREE.Mesh(holeGeo, holeMat);
+          holeMesh.rotation.x = -Math.PI / 2;
+          holeMesh.position.set(x, 0.002, z);
+          groundGridGroup.add(holeMesh);
+
+          const rimMesh = new THREE.Mesh(ringGeo, ringMat);
+          rimMesh.rotation.x = -Math.PI / 2;
+          rimMesh.position.set(x, 0.003, z);
+          groundGridGroup.add(rimMesh);
+        }
+      }
+    }
+
+    /**
+     * Initializes shared materials for Porcelain Pawn Pegs.
+     */
+    function setupPegMaterials() {
+      porcelainMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.25,
+        metalness: 0.1
+      });
+
+      pegSelectedMaterial = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.4,
+        roughness: 0.2,
+        metalness: 0.1
+      });
+    }
+
+    /**
+     * Constructs procedural 3D Pawn/Bulb Peg Mesh.
+     */
+    function createPegMesh() {
+      const pegGroup = new THREE.Group();
+
+      // Base cylinder
+      const baseGeo = new THREE.CylinderGeometry(0.28, 0.38, 0.4, 24);
+      const baseMesh = new THREE.Mesh(baseGeo, porcelainMaterial);
+      baseMesh.position.y = 0.2;
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      pegGroup.add(baseMesh);
+
+      // Middle neck cylinder
+      const neckGeo = new THREE.CylinderGeometry(0.2, 0.28, 0.3, 24);
+      const neckMesh = new THREE.Mesh(neckGeo, porcelainMaterial);
+      neckMesh.position.y = 0.55;
+      neckMesh.castShadow = true;
+      neckMesh.receiveShadow = true;
+      pegGroup.add(neckMesh);
+
+      // Top sphere bulb
+      const headGeo = new THREE.SphereGeometry(0.32, 24, 24);
+      const headMesh = new THREE.Mesh(headGeo, porcelainMaterial);
+      headMesh.position.y = 0.85;
+      headMesh.castShadow = true;
+      headMesh.receiveShadow = true;
+      pegGroup.add(headMesh);
+
+      // Custom property to reference group
+      pegGroup.userData = { isPeg: true };
+
+      return pegGroup;
+    }
+
+    /**
+     * Creates glowing target marker (ring + energy pillar beam + point light).
+     */
+    function createTargetMarker() {
+      // Energy beam cylinder
+      const pillarGeo = new THREE.CylinderGeometry(0.22, 0.22, 12, 24, 1, true);
+      const pillarMat = new THREE.MeshBasicMaterial({
+        color: 0x10b981,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide
+      });
+      targetPillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
+      targetPillarMesh.position.y = 6;
+      targetGroup.add(targetPillarMesh);
+
+      // Outer glowing ring on ground
+      const ringGeo = new THREE.RingGeometry(0.25, 0.45, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x10b981,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+      });
+      targetRingMesh = new THREE.Mesh(ringGeo, ringMat);
+      targetRingMesh.rotation.x = -Math.PI / 2;
+      targetRingMesh.position.y = 0.005;
+      targetGroup.add(targetRingMesh);
+
+      // Target Point Light
+      const targetLight = new THREE.PointLight(0x10b981, 2, 6);
+      targetLight.position.set(0, 1.5, 0);
+      targetGroup.add(targetLight);
+    }
+
+    /**
+     * Position target marker at (x, y) grid coordinates.
+     */
+    function updateTargetPosition(x, z) {
+      targetGroup.position.set(x, 0, z);
+    }
+
+    /**
+     * Renders parabolic jump curve previews and target hole rings when peg is selected.
+     */
+    function renderJumpPreviews(selectedPeg, validMoves) {
+      clearPreviews();
+
+      validMoves.forEach(move => {
+        const startPos = new THREE.Vector3(selectedPeg.x, 0.85, selectedPeg.y);
+        const pivotPos = new THREE.Vector3(move.pivot.x, 0, move.pivot.y);
+        const endPos = new THREE.Vector3(move.dest.x, 0.85, move.dest.y);
+
+        const dist = startPos.distanceTo(endPos);
+        const apexHeight = Math.min(Math.max(0.5 * dist, 1.2), 4.0);
+        const midPoint = new THREE.Vector3().addVectors(startPos, endPos).multiplyScalar(0.5);
+        midPoint.y += apexHeight;
+
+        // Quadratic Bezier Curve 3D
+        const curve = new THREE.QuadraticBezierCurve3(startPos, midPoint, endPos);
+        const points = curve.getPoints(30);
+        const curveGeo = new THREE.BufferGeometry().setFromPoints(points);
+
+        const curveMat = new THREE.LineDashedMaterial({
+          color: 0xfbbf24,
+          dashSize: 0.2,
+          gapSize: 0.1,
+          linewidth: 3
+        });
+        const line = new THREE.Line(curveGeo, curveMat);
+        line.computeLineDistances();
+        previewGroup.add(line);
+
+        // Ground projection line (Start -> Pivot -> Landing)
+        const projGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(selectedPeg.x, 0.02, selectedPeg.y),
+          new THREE.Vector3(move.pivot.x, 0.02, move.pivot.y),
+          new THREE.Vector3(move.dest.x, 0.02, move.dest.y)
+        ]);
+        const projMat = new THREE.LineDashedMaterial({
+          color: 0x64748b,
+          dashSize: 0.15,
+          gapSize: 0.1,
+          opacity: 0.6,
+          transparent: true
+        });
+        const projLine = new THREE.Line(projGeo, projMat);
+        projLine.computeLineDistances();
+        previewGroup.add(projLine);
+
+        // Valid Target Hole Ring Indicator
+        const targetRingGeo = new THREE.RingGeometry(0.25, 0.42, 32);
+        const targetRingMat = new THREE.MeshBasicMaterial({
+          color: 0xfbbf24,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.85
+        });
+        const ringMesh = new THREE.Mesh(targetRingGeo, targetRingMat);
+        ringMesh.rotation.x = -Math.PI / 2;
+        ringMesh.position.set(move.dest.x, 0.008, move.dest.y);
+        ringMesh.userData = { isTargetRing: true, moveData: move };
+        previewGroup.add(ringMesh);
+      });
+    }
+
+    function clearPreviews() {
+      while (previewGroup.children.length > 0) {
+        const child = previewGroup.children[0];
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+        previewGroup.remove(child);
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- 5. JUMP ANIMATION ENGINE ---
+    function animateJump(pegObj, pivotObj, destCoord, onComplete) {
+      GameState.isAnimating = true;
+      playSoundJump();
+
+      const startPos = new THREE.Vector3(pegObj.x, 0, pegObj.y);
+      const endPos = new THREE.Vector3(destCoord.x, 0, destCoord.y);
+      const dist = startPos.distanceTo(endPos);
+      const apexHeight = Math.min(Math.max(0.5 * dist, 1.2), 4.0);
+      const midPoint = new THREE.Vector3().addVectors(startPos, endPos).multiplyScalar(0.5);
+      midPoint.y += apexHeight;
+
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(pegObj.x, 0, pegObj.y),
+        midPoint,
+        new THREE.Vector3(destCoord.x, 0, destCoord.y)
+      );
+
+      const duration = 400; // ms
+      const startTime = performance.now();
+
+      function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1.0);
+
+        // Quad Bezier position interpolation
+        const currentPos = curve.getPoint(progress);
+        pegObj.mesh.position.copy(currentPos);
+
+        if (progress < 1.0) {
+          requestAnimationFrame(update);
+        } else {
+          // Final landing position update
+          pegObj.x = destCoord.x;
+          pegObj.y = destCoord.y;
+          pegObj.mesh.position.set(destCoord.x, 0, destCoord.y);
+
+          // Landing Sound & Squash-and-Stretch Animation
+          playSoundLanding();
+          triggerSquashAndStretch(pegObj.mesh, () => {
+            GameState.isAnimating = false;
+            if (onComplete) onComplete();
+          });
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    function triggerSquashAndStretch(mesh, onDone) {
+      const startTime = performance.now();
+      const duration = 150; // ms
+
+      function animate(now) {
+        const elapsed = now - startTime;
+        const p = Math.min(elapsed / duration, 1.0);
+
+        // Squash down then bounce back (0.85 -> 1.0 scale)
+        const scaleY = 1.0 - 0.15 * Math.sin(p * Math.PI);
+        const scaleXZ = 1.0 + 0.1 * Math.sin(p * Math.PI);
+        mesh.scale.set(scaleXZ, scaleY, scaleXZ);
+
+        if (p < 1.0) {
+          requestAnimationFrame(animate);
+        } else {
+          mesh.scale.set(1, 1, 1);
+          if (onDone) onDone();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // --- 6. RAYCASTING, CONTROLS & EVENT HANDLERS ---
+    function setupInteractions() {
+      const canvas = renderer.domElement;
+
+      canvas.addEventListener('pointermove', onPointerMove, false);
+      canvas.addEventListener('pointerdown', onPointerDown, false);
+      canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        deselectPeg();
+      });
+
+      // Keyboard shortcuts
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          undoMove();
+        } else if (e.key.toLowerCase() === 'r') {
+          restartLevel();
+        } else if (e.key === 'Escape') {
+          deselectPeg();
+          closeAllModals();
+        }
+      });
+
+      // UI Button Listeners
+      document.getElementById('btn-undo').addEventListener('click', undoMove);
+      document.getElementById('btn-restart').addEventListener('click', restartLevel);
+      document.getElementById('btn-cam-reset').addEventListener('click', resetCameraView);
+      document.getElementById('btn-mute').addEventListener('click', toggleMute);
+      document.getElementById('btn-levels').addEventListener('click', openLevelsModal);
+      document.getElementById('btn-close-levels').addEventListener('click', closeAllModals);
+      document.getElementById('btn-how-to').addEventListener('click', openHowToModal);
+      document.getElementById('btn-close-how-to').addEventListener('click', closeAllModals);
+      document.getElementById('btn-replay').addEventListener('click', () => {
+        closeAllModals();
+        restartLevel();
+      });
+      document.getElementById('btn-next-level').addEventListener('click', () => {
+        closeAllModals();
+        if (GameState.currentLevel < LEVELS.length) {
+          loadLevel(GameState.currentLevel + 1);
+        } else {
+          loadLevel(1);
+        }
+      });
+    }
+
+    function onPointerMove(event) {
+      if (GameState.isAnimating) return;
+
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      // Check peg hover
+      const pegMeshes = GameState.pegs.map(p => p.mesh);
+      const intersects = raycaster.intersectObjects(pegMeshes, true);
+
+      if (intersects.length > 0) {
+        let topObject = intersects[0].object;
+        while (topObject.parent && topObject.parent !== pegsGroup) {
+          topObject = topObject.parent;
+        }
+
+        if (hoverMesh !== topObject) {
+          resetHoverState();
+          hoverMesh = topObject;
+          if (hoverMesh !== (GameState.selectedPeg ? GameState.selectedPeg.mesh : null)) {
+            hoverMesh.position.y = 0.2; // Hover lift (+0.2)
+          }
+        }
+        document.body.style.cursor = 'pointer';
+      } else {
+        // Check target ring hover
+        const previewIntersects = raycaster.intersectObjects(previewGroup.children, true);
+        const targetRingHover = previewIntersects.find(i => i.object.userData && i.object.userData.isTargetRing);
+
+        if (targetRingHover) {
+          document.body.style.cursor = 'pointer';
+        } else {
+          document.body.style.cursor = 'default';
+          resetHoverState();
+        }
+      }
+    }
+
+    function resetHoverState() {
+      if (hoverMesh && hoverMesh !== (GameState.selectedPeg ? GameState.selectedPeg.mesh : null)) {
+        hoverMesh.position.y = 0;
+        hoverMesh = null;
+      }
+    }
+
+    function onPointerDown(event) {
+      if (GameState.isAnimating || event.button !== 0) return;
+
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      // 1. Check if user clicked a valid target landing ring indicator
+      const previewIntersects = raycaster.intersectObjects(previewGroup.children, true);
+      const targetRingHit = previewIntersects.find(i => i.object.userData && i.object.userData.isTargetRing);
+
+      if (targetRingHit && GameState.selectedPeg) {
+        const moveData = targetRingHit.object.userData.moveData;
+        executeJump(GameState.selectedPeg, moveData.pivot, moveData.dest);
+        return;
+      }
+
+      // 2. Check if user clicked a peg mesh
+      const pegMeshes = GameState.pegs.map(p => p.mesh);
+      const intersects = raycaster.intersectObjects(pegMeshes, true);
+
+      if (intersects.length > 0) {
+        let topObject = intersects[0].object;
+        while (topObject.parent && topObject.parent !== pegsGroup) {
+          topObject = topObject.parent;
+        }
+
+        const clickedPeg = GameState.pegs.find(p => p.mesh === topObject);
+
+        if (clickedPeg) {
+          // If in Aiming mode and user clicks a pivot peg B that is valid, execute jump
+          if (GameState.selectedPeg) {
+            const validMoveForPivot = GameState.validMoves.find(m => m.pivot.id === clickedPeg.id);
+            if (validMoveForPivot) {
+              executeJump(GameState.selectedPeg, validMoveForPivot.pivot, validMoveForPivot.dest);
+              return;
+            }
+          }
+
+          // Otherwise, select peg A
+          selectPeg(clickedPeg);
+          return;
+        }
+      }
+
+      // 3. Clicked empty space: deselect
+      deselectPeg();
+    }
+
+    function selectPeg(peg) {
+      deselectPeg();
+
+      GameState.selectedPeg = peg;
+      playSoundSelect();
+
+      // Highlight selected peg material
+      peg.mesh.traverse(child => {
+        if (child.isMesh) child.material = pegSelectedMaterial;
+      });
+
+      // Lift peg position
+      peg.mesh.position.y = 0.2;
+
+      // Calculate valid moves
+      GameState.validMoves = getValidMovesForPeg(peg, GameState.pegs);
+
+      if (GameState.validMoves.length > 0) {
+        renderJumpPreviews(peg, GameState.validMoves);
+        updateHintToast(`Aiming Mode: Click a yellow ring or pivot peg to jump (${GameState.validMoves.length} valid move${GameState.validMoves.length > 1 ? 's' : ''}).`);
+      } else {
+        playSoundError();
+        updateHintToast("No valid reflection jumps available for this peg!");
+      }
+    }
+
+    function deselectPeg() {
+      if (GameState.selectedPeg) {
+        GameState.selectedPeg.mesh.position.y = 0;
+        GameState.selectedPeg.mesh.traverse(child => {
+          if (child.isMesh) child.material = porcelainMaterial;
+        });
+        GameState.selectedPeg = null;
+        GameState.validMoves = [];
+        clearPreviews();
+        updateHintToast("Click a peg to activate reflection jump trajectories.");
+      }
+    }
+
+    function executeJump(pegA, pivotB, destC) {
+      saveHistorySnapshot();
+      clearPreviews();
+
+      // Reset peg material & elevation before jump animation starts
+      pegA.mesh.traverse(child => {
+        if (child.isMesh) child.material = porcelainMaterial;
+      });
+      GameState.selectedPeg = null;
+
+      animateJump(pegA, pivotB, destC, () => {
+        GameState.movesCount++;
+        updateHUDStats();
+
+        // Check Win Condition
+        if (checkWinCondition()) {
+          onLevelCompleted();
+        } else {
+          updateHintToast("Jump executed! Select a peg for the next leap.");
+        }
+      });
+    }
+
+    function undoMove() {
+      if (GameState.isAnimating || GameState.history.length === 0) {
+        playSoundError();
+        return;
+      }
+
+      const previousSnapshot = GameState.history.pop();
+      GameState.movesCount = Math.max(0, GameState.movesCount - 1);
+
+      // Restore positions
+      previousSnapshot.forEach(snap => {
+        const peg = GameState.pegs.find(p => p.id === snap.id);
+        if (peg) {
+          peg.x = snap.x;
+          peg.y = snap.y;
+          peg.mesh.position.set(snap.x, 0, snap.y);
+        }
+      });
+
+      deselectPeg();
+      updateHUDStats();
+      playSoundSelect();
+      updateHintToast("Undo performed.");
+    }
+
+    // --- 7. LEVEL MANAGEMENT & MODALS ---
+    function loadLevel(levelId) {
+      const levelData = LEVELS.find(l => l.id === levelId) || LEVELS[0];
+      GameState.currentLevel = levelData.id;
+      GameState.movesCount = 0;
+      GameState.history = [];
+      GameState.selectedPeg = null;
+      GameState.validMoves = [];
+
+      // Clear existing peg meshes
+      while (pegsGroup.children.length > 0) {
+        const child = pegsGroup.children[0];
+        pegsGroup.remove(child);
+      }
+      clearPreviews();
+
+      // Create new pegs
+      GameState.pegs = levelData.pegs.map(pData => {
+        const mesh = createPegMesh();
+        mesh.position.set(pData.x, 0, pData.y);
+        pegsGroup.add(mesh);
+        return {
+          id: pData.id,
+          x: pData.x,
+          y: pData.y,
+          mesh: mesh
+        };
+      });
+
+      // Update target coordinate
+      GameState.target = { ...levelData.target };
+      updateTargetPosition(levelData.target.x, levelData.target.y);
+
+      // Update HUD
+      document.getElementById('level-num').textContent = levelData.id;
+      document.getElementById('level-name').textContent = levelData.name;
+      document.getElementById('level-desc').textContent = levelData.description;
+      document.getElementById('target-coord').textContent = `(${levelData.target.x}, ${levelData.target.y})`;
+      document.getElementById('par-moves').textContent = levelData.parMoves;
+      updateHUDStats();
+
+      // Camera reset to level position
+      resetCameraView();
+      updateHintToast("Level loaded. Select a peg to begin.");
+    }
+
+    function restartLevel() {
+      if (GameState.isAnimating) return;
+      loadLevel(GameState.currentLevel);
+    }
+
+    function resetCameraView() {
+      const levelData = LEVELS.find(l => l.id === GameState.currentLevel) || LEVELS[0];
+      const targetCam = levelData.cameraPos || { x: 1, y: 10, z: 8 };
+
+      camera.position.set(targetCam.x, targetCam.y, targetCam.z);
+      controls.target.set(targetCam.x / 2, 0, targetCam.z / 4);
+      controls.update();
+    }
+
+    function updateHUDStats() {
+      document.getElementById('moves-count').textContent = GameState.movesCount;
+    }
+
+    function updateHintToast(msg) {
+      document.getElementById('hint-text').textContent = msg;
+    }
+
+    function onLevelCompleted() {
+      playSoundWin();
+
+      // Save best score
+      const levelId = GameState.currentLevel;
+      const currentMoves = GameState.movesCount;
+      const prevBest = GameState.bestScores[levelId];
+
+      if (prevBest === undefined || currentMoves < prevBest) {
+        GameState.bestScores[levelId] = currentMoves;
+        localStorage.setItem('3d_pegs_best', JSON.stringify(GameState.bestScores));
+      }
+
+      // Star calculation
+      const par = LEVELS.find(l => l.id === levelId).parMoves;
+      let stars = 1;
+      if (currentMoves <= par) stars = 3;
+      else if (currentMoves <= par + 1) stars = 2;
+
+      // Confetti burst
+      if (window.confetti) {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+
+      // Populate Complete Modal
+      document.getElementById('complete-level-title').textContent = `Level ${levelId}: ${LEVELS.find(l => l.id === levelId).name}`;
+      document.getElementById('complete-moves').textContent = currentMoves;
+      document.getElementById('complete-par').textContent = par;
+
+      const starsContainer = document.getElementById('complete-stars');
+      starsContainer.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const star = document.createElement('span');
+        star.className = i < stars ? 'text-amber-400 filter drop-shadow' : 'text-slate-700';
+        star.textContent = '★';
+        starsContainer.appendChild(star);
+      }
+
+      document.getElementById('modal-complete').classList.remove('hidden');
+    }
+
+    function openLevelsModal() {
+      const grid = document.getElementById('levels-grid');
+      grid.innerHTML = '';
+
+      LEVELS.forEach(lvl => {
+        const best = GameState.bestScores[lvl.id];
+        const isCompleted = best !== undefined;
+        const isCurrent = GameState.currentLevel === lvl.id;
+
+        const card = document.createElement('div');
+        card.className = `glass-button p-4 rounded-2xl flex flex-col justify-between cursor-pointer border ${isCurrent ? 'border-cyan-500/80 bg-cyan-950/30' : 'border-slate-800'}`;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-cyan-400 font-mono">LEVEL ${lvl.id}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">${lvl.difficulty}</span>
+            </div>
+            <h3 class="font-bold text-white text-base mb-1">${lvl.name}</h3>
+            <p class="text-xs text-slate-400 mb-3">${lvl.description}</p>
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs font-mono">
+            <span class="text-slate-400">Par: <strong class="text-slate-200">${lvl.parMoves}</strong></span>
+            <span class="${isCompleted ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+              ${isCompleted ? `Best: ${best} moves` : 'Unsolved'}
+            </span>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          closeAllModals();
+          loadLevel(lvl.id);
+        });
+
+        grid.appendChild(card);
+      });
+
+      document.getElementById('modal-levels').classList.remove('hidden');
+    }
+
+    function openHowToModal() {
+      document.getElementById('modal-how-to').classList.remove('hidden');
+    }
+
+    function closeAllModals() {
+      document.getElementById('modal-levels').classList.add('hidden');
+      document.getElementById('modal-how-to').classList.add('hidden');
+      document.getElementById('modal-complete').classList.add('hidden');
+    }
+
+    // --- 8. MAIN ANIMATION LOOP & INIT ---
+    function animate(time) {
+      requestAnimationFrame(animate);
+
+      // Pulse target energy beam
+      if (targetPillarMesh) {
+        targetPillarMesh.rotation.y += 0.01;
+      }
+      if (targetRingMesh) {
+        targetRingMesh.scale.setScalar(1.0 + 0.05 * Math.sin(time * 0.003));
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Main Game Entry Point
+    window.addEventListener('DOMContentLoaded', () => {
+      init3DScene();
+      setupInteractions();
+      loadLevel(1);
+      animate(0);
+    });
+  </script>
+</body>
+</html>
