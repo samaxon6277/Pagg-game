@@ -13,6 +13,9 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <!-- Canvas Confetti CDN -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Firebase Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;600&display=swap');
@@ -97,6 +100,21 @@
   <!-- Main Game UI Layer -->
   <div class="relative z-10 flex flex-col justify-between h-full p-2.5 sm:p-4 pointer-events-none">
 
+    <!-- Multiplayer Banner Status Bar -->
+    <div id="mp-hud-banner" class="hidden pointer-events-auto w-full max-w-md mx-auto mb-2 glass-panel px-4 py-2 rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-lg glow-emerald">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div>
+          <span id="mp-room-code-badge" class="font-mono text-xs font-bold text-emerald-300">ROOM: ------</span>
+          <p id="mp-opponent-status" class="text-[10px] text-slate-300 truncate max-w-[140px]">vs Opponent</p>
+        </div>
+      </div>
+      <div id="mp-turn-badge" class="px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-bold text-cyan-300">
+        Your Turn
+      </div>
+      <button id="btn-leave-room" class="p-1 text-slate-400 hover:text-rose-400 text-xs">✕ Leave</button>
+    </div>
+
     <!-- Top HUD Header (Unified Compact Bar) -->
     <header class="flex items-center justify-between gap-1.5 sm:gap-3 pointer-events-auto w-full max-w-full">
       <!-- Left: Level Badge & Title -->
@@ -162,6 +180,26 @@
 
         <!-- Navigation Links / Controls -->
         <div class="space-y-3">
+          <!-- Profile Badge in Drawer -->
+          <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center text-xs flex-shrink-0">👤</div>
+              <div class="min-w-0">
+                <p id="drawer-player-name" class="text-xs font-bold text-white truncate">Player</p>
+                <p id="drawer-player-status" class="text-[10px] text-emerald-400 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Online
+                </p>
+              </div>
+            </div>
+            <button id="btn-edit-profile" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">
+              ✎
+            </button>
+          </div>
+
+          <button id="drawer-btn-multiplayer" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-emerald-300 border-emerald-500/30 glow-emerald">
+            <span class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">⚔️</span>
+            Multiplayer & Friends
+          </button>
           <button id="drawer-btn-main-menu" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
             <span class="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">🏠</span>
             Main Title Screen
@@ -238,6 +276,71 @@
   </div>
 
   <!-- MODALS -->
+
+  <!-- Direct Invite Toast Notification Banner -->
+  <div id="toast-invite" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 glass-panel px-5 py-4 rounded-2xl border border-emerald-500/50 shadow-2xl glow-emerald flex items-center gap-4 hidden max-w-sm w-full">
+    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-lg flex-shrink-0">
+      ⚔️
+    </div>
+    <div class="min-w-0 flex-1">
+      <p id="toast-invite-sender" class="text-xs font-bold text-white truncate">Friend invited you!</p>
+      <p class="text-[10px] text-slate-300">Wants to play 3D Jumping Pegs</p>
+    </div>
+    <div class="flex items-center gap-1.5 flex-shrink-0">
+      <button id="btn-invite-accept" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow">Accept</button>
+      <button id="btn-invite-decline" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">✕</button>
+    </div>
+  </div>
+
+  <!-- Multiplayer Modal (Create, Join & Friends List) -->
+  <div id="modal-multiplayer" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-300">
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-6 relative border border-slate-700/50 shadow-2xl">
+      <button id="btn-close-multiplayer" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+
+      <h2 class="text-2xl font-bold text-white mb-1 flex items-center gap-3">
+        <span class="text-emerald-400">⚔️</span> Real-Time Multiplayer
+      </h2>
+      <p class="text-xs text-slate-400 mb-6">Play live with friends using 6-digit room codes.</p>
+
+      <!-- Tabs Navigation -->
+      <div class="flex bg-slate-900/80 p-1 rounded-2xl mb-6 border border-slate-800 text-xs font-semibold">
+        <button id="tab-mp-create" class="flex-1 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Create Room</button>
+        <button id="tab-mp-join" class="flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white">Join Room</button>
+        <button id="tab-mp-friends" class="flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white">Friends List</button>
+      </div>
+
+      <!-- Tab Content: Create Room -->
+      <div id="content-mp-create" class="space-y-4">
+        <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 text-center">
+          <p class="text-xs text-slate-400 mb-2">Selected Game Level</p>
+          <p id="mp-create-level-name" class="text-base font-bold text-white mb-4">Level 1: The First Hop</p>
+          <button id="btn-create-room-action" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-sm shadow-lg glow-emerald hover:opacity-95">
+            Host Room Code
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content: Join Room -->
+      <div id="content-mp-join" class="space-y-4 hidden">
+        <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800">
+          <label class="block text-xs text-slate-400 mb-2 font-medium">Enter 6-Digit Room Code</label>
+          <input id="input-room-code" type="text" maxlength="6" placeholder="e.g. A8X2K9" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center font-mono-code text-xl font-bold text-emerald-300 focus:outline-none focus:border-emerald-500 uppercase tracking-widest mb-4">
+          <button id="btn-join-room-action" class="w-full py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-lg glow-cyan">
+            Join Game
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content: Friends List -->
+      <div id="content-mp-friends" class="space-y-3 hidden">
+        <div id="friends-list-container" class="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+          <!-- Dynamic Friends Items -->
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Level Select Modal -->
   <div id="modal-levels" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-300">
@@ -642,8 +745,567 @@
       validMoves: [], // [{ pivot: pegObj, dest: {x, y} }]
       soundMuted: false,
       isMainMenu: true,
-      bestScores: JSON.parse(localStorage.getItem('3d_pegs_best') || '{}')
+      bestScores: JSON.parse(localStorage.getItem('3d_pegs_best') || '{}'),
+      // Multiplayer State
+      multiplayer: {
+        active: false,
+        roomCode: null,
+        isHost: false,
+        playerRole: null, // 'host' or 'guest'
+        currentTurn: 'host',
+        opponentUid: null,
+        opponentName: 'Opponent',
+        connected: false
+      }
     };
+
+    // --- FIREBASE INITIALIZATION & ONLINE PRESENCE ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyCVWqs-CEjBIgJ6QFY1BV9S_ITlp0_1qKE",
+      authDomain: "pagg-game.firebaseapp.com",
+      databaseURL: "https://pagg-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "pagg-game",
+      storageBucket: "pagg-game.firebasestorage.app",
+      messagingSenderId: "673171286943",
+      appId: "1:673171286943:web:5e61f4fedc5a9c87642baa"
+    };
+
+    let db = null;
+    let localPlayer = {
+      uid: localStorage.getItem('3d_pegs_uid') || 'p_' + Math.random().toString(36).substring(2, 9),
+      name: localStorage.getItem('3d_pegs_name') || 'Player_' + Math.floor(1000 + Math.random() * 9000)
+    };
+    localStorage.setItem('3d_pegs_uid', localPlayer.uid);
+    localStorage.setItem('3d_pegs_name', localPlayer.name);
+
+    function initFirebase() {
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.database();
+        setupPresenceSystem();
+        setupDirectInvitesListener();
+      }
+    }
+
+    function setupPresenceSystem() {
+      if (!db) return;
+      const myUserRef = db.ref(`/users/${localPlayer.uid}`);
+      const connectedRef = db.ref('.info/connected');
+
+      connectedRef.on('value', (snap) => {
+        if (snap.val() === true) {
+          myUserRef.onDisconnect().set({
+            name: localPlayer.name,
+            state: 'offline',
+            lastSeen: firebase.database.ServerValue.TIMESTAMP
+          });
+
+          myUserRef.set({
+            name: localPlayer.name,
+            state: 'online',
+            lastSeen: firebase.database.ServerValue.TIMESTAMP
+          });
+        }
+      });
+    }
+
+    function updateLocalProfileName(newName) {
+      if (!newName || !newName.trim()) return;
+      localPlayer.name = newName.trim().substring(0, 16);
+      localStorage.setItem('3d_pegs_name', localPlayer.name);
+
+      const drawerName = document.getElementById('drawer-player-name');
+      if (drawerName) drawerName.textContent = localPlayer.name;
+
+      if (db) {
+        db.ref(`/users/${localPlayer.uid}/name`).set(localPlayer.name);
+      }
+    }
+
+    // --- MULTIPLAYER ROOM CREATION & JOINING LOGIC ---
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    let roomRef = null;
+
+    function createMultiplayerRoom(levelId = 1) {
+      if (!db) {
+        alert("Firebase connection failed. Please check internet connection.");
+        return;
+      }
+
+      const code = generateRoomCode();
+      GameState.multiplayer = {
+        active: true,
+        roomCode: code,
+        isHost: true,
+        playerRole: 'host',
+        currentTurn: 'host',
+        opponentUid: null,
+        opponentName: 'Waiting for player...',
+        connected: false
+      };
+
+      roomRef = db.ref(`/rooms/${code}`);
+      const initialLevel = LEVELS.find(l => l.id === levelId) || LEVELS[0];
+
+      const roomData = {
+        code: code,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        host: {
+          uid: localPlayer.uid,
+          name: localPlayer.name
+        },
+        guest: null,
+        levelId: initialLevel.id,
+        currentTurn: 'host',
+        gameState: {
+          pegs: initialLevel.pegs.map(p => ({ id: p.id, x: p.x, y: p.y })),
+          movesCount: 0
+        },
+        lastAction: { type: 'INIT', timestamp: firebase.database.ServerValue.TIMESTAMP }
+      };
+
+      roomRef.set(roomData).then(() => {
+        listenToRoomEvents(code);
+        showMultiplayerRoomUI(code, true);
+        loadLevel(initialLevel.id);
+      });
+    }
+
+    function joinMultiplayerRoom(code) {
+      if (!db) return;
+      const cleanCode = code.trim().toUpperCase();
+      if (!cleanCode) return;
+
+      const targetRoomRef = db.ref(`/rooms/${cleanCode}`);
+      targetRoomRef.once('value').then((snap) => {
+        if (!snap.exists()) {
+          alert('Room code not found. Please verify code.');
+          return;
+        }
+
+        const roomData = snap.val();
+        if (roomData.guest && roomData.guest.uid !== localPlayer.uid) {
+          alert('Room is already full.');
+          return;
+        }
+
+        GameState.multiplayer = {
+          active: true,
+          roomCode: cleanCode,
+          isHost: false,
+          playerRole: 'guest',
+          currentTurn: roomData.currentTurn || 'host',
+          opponentUid: roomData.host.uid,
+          opponentName: roomData.host.name,
+          connected: true
+        };
+
+        roomRef = targetRoomRef;
+        roomRef.child('guest').set({
+          uid: localPlayer.uid,
+          name: localPlayer.name
+        });
+
+        // Automatically add each other as friends upon joining room!
+        addFriend(roomData.host.uid, roomData.host.name);
+
+        listenToRoomEvents(cleanCode);
+        showMultiplayerRoomUI(cleanCode, false);
+        loadLevel(roomData.levelId || 1);
+      });
+    }
+
+    function leaveMultiplayerRoom() {
+      if (roomRef) {
+        if (GameState.multiplayer.isHost) {
+          roomRef.remove();
+        } else {
+          roomRef.child('guest').remove();
+        }
+        roomRef.off();
+        roomRef = null;
+      }
+
+      GameState.multiplayer = {
+        active: false,
+        roomCode: null,
+        isHost: false,
+        playerRole: null,
+        currentTurn: 'host',
+        opponentUid: null,
+        opponentName: 'Opponent',
+        connected: false
+      };
+
+      hideMultiplayerRoomUI();
+    }
+
+    // --- REAL-TIME GAME STATE & MOVE SYNCHRONIZATION ---
+    function listenToRoomEvents(code) {
+      if (!roomRef) return;
+
+      // Guest player connected event
+      roomRef.child('guest').on('value', (snap) => {
+        const guest = snap.val();
+        if (guest && GameState.multiplayer.isHost) {
+          GameState.multiplayer.opponentUid = guest.uid;
+          GameState.multiplayer.opponentName = guest.name;
+          GameState.multiplayer.connected = true;
+
+          // Automatically add guest to host's friends list
+          addFriend(guest.uid, guest.name);
+          updateMultiplayerHUD();
+        } else if (!guest && GameState.multiplayer.isHost) {
+          GameState.multiplayer.opponentName = 'Waiting for player...';
+          GameState.multiplayer.connected = false;
+          updateMultiplayerHUD();
+        }
+      });
+
+      // Synchronized game moves/actions event
+      roomRef.child('lastAction').on('value', (snap) => {
+        const action = snap.val();
+        if (!action || !action.by || action.by === localPlayer.uid) return;
+
+        if (action.type === 'JUMP') {
+          const pegObj = GameState.pegs.find(p => p.id === action.pegId);
+          const pivotObj = GameState.pegs.find(p => p.id === action.pivotId);
+          if (pegObj && pivotObj) {
+            animateJump(pegObj, pivotObj, action.dest, () => {
+              GameState.movesCount = action.movesCount;
+              GameState.multiplayer.currentTurn = action.nextTurn;
+              updateHUDStats();
+              updateMultiplayerHUD();
+
+              if (checkWinCondition()) {
+                onLevelCompleted();
+              }
+            });
+          }
+        } else if (action.type === 'UNDO') {
+          if (GameState.history.length > 0) {
+            undoMoveLocalOnly();
+            GameState.multiplayer.currentTurn = action.nextTurn;
+            updateMultiplayerHUD();
+          }
+        } else if (action.type === 'RESTART') {
+          loadLevelLocalOnly(action.levelId);
+          GameState.multiplayer.currentTurn = 'host';
+          updateMultiplayerHUD();
+        }
+      });
+
+      // Turn state sync
+      roomRef.child('currentTurn').on('value', (snap) => {
+        const turn = snap.val();
+        if (turn) {
+          GameState.multiplayer.currentTurn = turn;
+          updateMultiplayerHUD();
+        }
+      });
+    }
+
+    function sendMultiplayerJump(pegId, pivotId, destCoord) {
+      if (!GameState.multiplayer.active || !roomRef) return;
+
+      const nextTurn = GameState.multiplayer.playerRole === 'host' ? 'guest' : 'host';
+      GameState.multiplayer.currentTurn = nextTurn;
+
+      roomRef.update({
+        currentTurn: nextTurn,
+        lastAction: {
+          type: 'JUMP',
+          by: localPlayer.uid,
+          pegId: pegId,
+          pivotId: pivotId,
+          dest: destCoord,
+          movesCount: GameState.movesCount,
+          nextTurn: nextTurn,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        }
+      });
+      updateMultiplayerHUD();
+    }
+
+    // --- AUTOMATIC FRIEND LIST & ONLINE PRESENCE TRACKING ---
+    let myFriendsMap = {};
+
+    function addFriend(friendUid, friendName) {
+      if (!db || !friendUid || friendUid === localPlayer.uid) return;
+
+      const friendRef = db.ref(`/users/${localPlayer.uid}/friends/${friendUid}`);
+      friendRef.set({
+        uid: friendUid,
+        name: friendName,
+        addedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+
+      // Also add local player to friend's friends list
+      db.ref(`/users/${friendUid}/friends/${localPlayer.uid}`).set({
+        uid: localPlayer.uid,
+        name: localPlayer.name,
+        addedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+
+    function listenToFriendsList(onUpdateCallback) {
+      if (!db) return;
+
+      const friendsRef = db.ref(`/users/${localPlayer.uid}/friends`);
+      friendsRef.on('value', (snap) => {
+        const friendsData = snap.val() || {};
+        const friendUids = Object.keys(friendsData);
+
+        if (friendUids.length === 0) {
+          myFriendsMap = {};
+          if (onUpdateCallback) onUpdateCallback([]);
+          return;
+        }
+
+        let loadedCount = 0;
+        const friendsList = [];
+
+        friendUids.forEach((uid) => {
+          db.ref(`/users/${uid}`).on('value', (userSnap) => {
+            const userInfo = userSnap.val() || {};
+            myFriendsMap[uid] = {
+              uid: uid,
+              name: userInfo.name || friendsData[uid].name || 'Friend',
+              state: userInfo.state || 'offline',
+              lastSeen: userInfo.lastSeen || null
+            };
+
+            loadedCount++;
+            if (onUpdateCallback) {
+              onUpdateCallback(Object.values(myFriendsMap));
+            }
+          });
+        });
+      });
+    }
+
+    function formatLastSeen(timestamp) {
+      if (!timestamp) return 'Offline';
+      const now = Date.now();
+      const diffMs = now - timestamp;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMins < 1) return 'Last seen just now';
+      if (diffMins < 60) return `Last seen ${diffMins}m ago`;
+      if (diffHours < 24) return `Last seen ${diffHours}h ago`;
+      return `Last seen ${diffDays}d ago`;
+    }
+
+    // --- DIRECT FRIEND GAME INVITES ---
+    function sendDirectInvite(friendUid) {
+      if (!db || !friendUid) return;
+
+      const code = generateRoomCode();
+      createMultiplayerRoom(GameState.currentLevel);
+
+      const inviteRef = db.ref(`/invites/${friendUid}`);
+      inviteRef.set({
+        fromUid: localPlayer.uid,
+        fromName: localPlayer.name,
+        roomCode: GameState.multiplayer.roomCode,
+        levelId: GameState.currentLevel,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      }).then(() => {
+        alert(`Invite sent to ${myFriendsMap[friendUid]?.name || 'friend'}! Creating room code: ${GameState.multiplayer.roomCode}`);
+      });
+    }
+
+    function setupDirectInvitesListener() {
+      if (!db) return;
+
+      const myInvitesRef = db.ref(`/invites/${localPlayer.uid}`);
+      myInvitesRef.on('value', (snap) => {
+        const invite = snap.val();
+        if (invite && invite.roomCode) {
+          showInviteToast(invite);
+        }
+      });
+    }
+
+    function respondToInvite(accept, inviteData) {
+      if (!db) return;
+
+      // Clear invite
+      db.ref(`/invites/${localPlayer.uid}`).remove();
+      hideInviteToast();
+
+      if (accept && inviteData && inviteData.roomCode) {
+        joinMultiplayerRoom(inviteData.roomCode);
+      }
+    }
+
+    let currentInviteData = null;
+
+    function showInviteToast(inviteData) {
+      currentInviteData = inviteData;
+      const toast = document.getElementById('toast-invite');
+      const senderText = document.getElementById('toast-invite-sender');
+      if (senderText) senderText.textContent = `${inviteData.fromName || 'Friend'} invited you!`;
+      if (toast) toast.classList.remove('hidden');
+    }
+
+    function hideInviteToast() {
+      const toast = document.getElementById('toast-invite');
+      if (toast) toast.classList.add('hidden');
+      currentInviteData = null;
+    }
+
+    // --- MULTIPLAYER UI MANAGEMENT ---
+    function updateMultiplayerHUD() {
+      const banner = document.getElementById('mp-hud-banner');
+      const codeBadge = document.getElementById('mp-room-code-badge');
+      const opponentStatus = document.getElementById('mp-opponent-status');
+      const turnBadge = document.getElementById('mp-turn-badge');
+
+      if (!GameState.multiplayer.active) {
+        if (banner) banner.classList.add('hidden');
+        return;
+      }
+
+      if (banner) banner.classList.remove('hidden');
+      if (codeBadge) codeBadge.textContent = `ROOM: ${GameState.multiplayer.roomCode}`;
+      if (opponentStatus) opponentStatus.textContent = `vs ${GameState.multiplayer.opponentName}`;
+
+      if (turnBadge) {
+        const isMyTurn = GameState.multiplayer.currentTurn === GameState.multiplayer.playerRole;
+        turnBadge.textContent = isMyTurn ? 'Your Turn' : "Opponent's Turn";
+        turnBadge.className = isMyTurn
+          ? 'px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-bold text-cyan-300'
+          : 'px-2.5 py-1 rounded-xl bg-amber-950/80 border border-amber-500/40 text-[11px] font-bold text-amber-300';
+      }
+    }
+
+    function showMultiplayerRoomUI(code, isHost) {
+      updateMultiplayerHUD();
+      closeAllModals();
+    }
+
+    function hideMultiplayerRoomUI() {
+      updateMultiplayerHUD();
+    }
+
+    function openMultiplayerModal() {
+      const modal = document.getElementById('modal-multiplayer');
+      if (modal) modal.classList.remove('hidden');
+
+      const lvlName = document.getElementById('mp-create-level-name');
+      const levelObj = LEVELS.find(l => l.id === GameState.currentLevel);
+      if (lvlName && levelObj) {
+        lvlName.textContent = `Level ${levelObj.id}: ${levelObj.name}`;
+      }
+
+      // Start listening to friends list
+      listenToFriendsList((friendsList) => {
+        renderFriendsListUI(friendsList);
+      });
+    }
+
+    function renderFriendsListUI(friendsList) {
+      const container = document.getElementById('friends-list-container');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      if (!friendsList || friendsList.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-6 text-xs text-slate-500">
+            No friends yet! Play a room code game with a friend to automatically add them here.
+          </div>
+        `;
+        return;
+      }
+
+      friendsList.forEach(friend => {
+        const item = document.createElement('div');
+        item.className = 'glass-button p-3 rounded-2xl flex items-center justify-between border border-slate-800';
+
+        const isOnline = friend.state === 'online';
+
+        item.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-xl ${isOnline ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'} font-bold flex items-center justify-center text-xs flex-shrink-0">
+              👤
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-white truncate">${friend.name}</p>
+              <p class="text-[10px] ${isOnline ? 'text-emerald-400 font-medium' : 'text-slate-400'} flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}"></span>
+                ${isOnline ? 'Online' : formatLastSeen(friend.lastSeen)}
+              </p>
+            </div>
+          </div>
+          ${isOnline ? `
+            <button class="btn-invite-friend px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs shadow glow-emerald hover:opacity-90 flex-shrink-0" data-uid="${friend.uid}">
+              Invite ⚔️
+            </button>
+          ` : `
+            <span class="text-[10px] text-slate-500 font-mono">Offline</span>
+          `}
+        `;
+
+        const btnInvite = item.querySelector('.btn-invite-friend');
+        if (btnInvite) {
+          btnInvite.addEventListener('click', () => {
+            sendDirectInvite(friend.uid);
+            closeAllModals();
+          });
+        }
+
+        container.appendChild(item);
+      });
+    }
+
+    function sendMultiplayerUndo() {
+      if (!GameState.multiplayer.active || !roomRef) return;
+
+      const nextTurn = GameState.multiplayer.playerRole === 'host' ? 'guest' : 'host';
+      GameState.multiplayer.currentTurn = nextTurn;
+
+      roomRef.update({
+        currentTurn: nextTurn,
+        lastAction: {
+          type: 'UNDO',
+          by: localPlayer.uid,
+          nextTurn: nextTurn,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        }
+      });
+      updateMultiplayerHUD();
+    }
+
+    function sendMultiplayerRestart(levelId) {
+      if (!GameState.multiplayer.active || !roomRef) return;
+
+      GameState.multiplayer.currentTurn = 'host';
+
+      roomRef.update({
+        currentTurn: 'host',
+        lastAction: {
+          type: 'RESTART',
+          by: localPlayer.uid,
+          levelId: levelId,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        }
+      });
+      updateMultiplayerHUD();
+    }
 
     // --- 2. MATHEMATICAL CORE & POINT REFLECTION MATH ---
     /**
@@ -1294,6 +1956,10 @@
         if (e.target === document.getElementById('drawer-backdrop')) closeDrawer();
       });
 
+      document.getElementById('drawer-btn-multiplayer').addEventListener('click', () => {
+        closeDrawer();
+        openMultiplayerModal();
+      });
       document.getElementById('drawer-btn-main-menu').addEventListener('click', () => {
         closeDrawer();
         showMainMenu();
@@ -1305,6 +1971,10 @@
       document.getElementById('drawer-btn-how-to').addEventListener('click', () => {
         closeDrawer();
         openHowToModal();
+      });
+      document.getElementById('btn-edit-profile').addEventListener('click', () => {
+        const newName = prompt('Enter your player nickname:', localPlayer.name);
+        if (newName) updateLocalProfileName(newName);
       });
       document.getElementById('drawer-btn-restart').addEventListener('click', () => {
         closeDrawer();
@@ -1325,8 +1995,63 @@
       // UI Button Listeners
       document.getElementById('btn-undo').addEventListener('click', undoMove);
       document.getElementById('btn-restart').addEventListener('click', restartLevel);
+      document.getElementById('btn-leave-room').addEventListener('click', leaveMultiplayerRoom);
       document.getElementById('btn-close-levels').addEventListener('click', closeAllModals);
       document.getElementById('btn-close-how-to').addEventListener('click', closeAllModals);
+      document.getElementById('btn-close-multiplayer').addEventListener('click', closeAllModals);
+
+      // Multiplayer Tabs Switching
+      const tabCreate = document.getElementById('tab-mp-create');
+      const tabJoin = document.getElementById('tab-mp-join');
+      const tabFriends = document.getElementById('tab-mp-friends');
+      const contentCreate = document.getElementById('content-mp-create');
+      const contentJoin = document.getElementById('content-mp-join');
+      const contentFriends = document.getElementById('content-mp-friends');
+
+      tabCreate.addEventListener('click', () => {
+        tabCreate.className = 'flex-1 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        tabJoin.className = 'flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white';
+        tabFriends.className = 'flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white';
+        contentCreate.classList.remove('hidden');
+        contentJoin.classList.add('hidden');
+        contentFriends.classList.add('hidden');
+      });
+
+      tabJoin.addEventListener('click', () => {
+        tabJoin.className = 'flex-1 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        tabCreate.className = 'flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white';
+        tabFriends.className = 'flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white';
+        contentJoin.classList.remove('hidden');
+        contentCreate.classList.add('hidden');
+        contentFriends.classList.add('hidden');
+      });
+
+      tabFriends.addEventListener('click', () => {
+        tabFriends.className = 'flex-1 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        tabCreate.className = 'flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white';
+        tabJoin.className = 'flex-1 py-2.5 rounded-xl text-slate-400 hover:text-white';
+        contentFriends.classList.remove('hidden');
+        contentCreate.classList.add('hidden');
+        contentJoin.classList.add('hidden');
+      });
+
+      document.getElementById('btn-create-room-action').addEventListener('click', () => {
+        createMultiplayerRoom(GameState.currentLevel);
+      });
+
+      document.getElementById('btn-join-room-action').addEventListener('click', () => {
+        const input = document.getElementById('input-room-code');
+        if (input && input.value) {
+          joinMultiplayerRoom(input.value);
+        }
+      });
+
+      document.getElementById('btn-invite-accept').addEventListener('click', () => {
+        if (currentInviteData) respondToInvite(true, currentInviteData);
+      });
+      document.getElementById('btn-invite-decline').addEventListener('click', () => {
+        if (currentInviteData) respondToInvite(false, currentInviteData);
+      });
       document.getElementById('btn-replay').addEventListener('click', () => {
         closeAllModals();
         restartLevel();
@@ -1479,6 +2204,13 @@
     }
 
     function executeJump(pegA, pivotB, destC) {
+      if (GameState.multiplayer.active && GameState.multiplayer.currentTurn !== GameState.multiplayer.playerRole) {
+        playSoundError();
+        alert("It's your opponent's turn!");
+        deselectPeg();
+        return;
+      }
+
       saveHistorySnapshot();
       clearPreviews();
 
@@ -1494,6 +2226,10 @@
         GameState.movesCount++;
         updateHUDStats();
 
+        if (GameState.multiplayer.active) {
+          sendMultiplayerJump(pegA.id, pivotB.id, destC);
+        }
+
         // Check Win Condition
         if (checkWinCondition()) {
           onLevelCompleted();
@@ -1501,16 +2237,12 @@
       });
     }
 
-    function undoMove() {
-      if (GameState.isAnimating || GameState.history.length === 0) {
-        playSoundError();
-        return;
-      }
+    function undoMoveLocalOnly() {
+      if (GameState.history.length === 0) return;
 
       const previousSnapshot = GameState.history.pop();
       GameState.movesCount = Math.max(0, GameState.movesCount - 1);
 
-      // Restore positions
       previousSnapshot.forEach(snap => {
         const peg = GameState.pegs.find(p => p.id === snap.id);
         if (peg) {
@@ -1522,7 +2254,26 @@
 
       deselectPeg();
       updateHUDStats();
+    }
+
+    function undoMove() {
+      if (GameState.isAnimating || GameState.history.length === 0) {
+        playSoundError();
+        return;
+      }
+
+      if (GameState.multiplayer.active && GameState.multiplayer.currentTurn !== GameState.multiplayer.playerRole) {
+        playSoundError();
+        alert("It's your opponent's turn!");
+        return;
+      }
+
+      undoMoveLocalOnly();
       playSoundSelect();
+
+      if (GameState.multiplayer.active) {
+        sendMultiplayerUndo();
+      }
     }
 
     // --- 7. LEVEL MANAGEMENT & MODALS ---
@@ -1712,6 +2463,8 @@
       document.getElementById('modal-levels').classList.add('hidden');
       document.getElementById('modal-how-to').classList.add('hidden');
       document.getElementById('modal-complete').classList.add('hidden');
+      const mpModal = document.getElementById('modal-multiplayer');
+      if (mpModal) mpModal.classList.add('hidden');
     }
 
     // --- 8. MAIN ANIMATION LOOP & INIT ---
@@ -1745,6 +2498,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       init3DScene();
       setupInteractions();
+      initFirebase();
       loadLevel(1);
       animate(0);
     });
