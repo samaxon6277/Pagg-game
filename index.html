@@ -95,78 +95,146 @@
   <div id="canvas-container"></div>
 
   <!-- Main Game UI Layer -->
-  <div class="relative z-10 flex flex-col justify-between h-full p-4 md:p-6 pointer-events-none">
+  <div class="relative z-10 flex flex-col justify-between h-full p-3 md:p-5 pointer-events-none">
 
-    <!-- Top HUD Header -->
-    <header class="flex flex-wrap items-center justify-between gap-4 pointer-events-auto">
-      <!-- Title & Level Info -->
-      <div class="glass-panel px-5 py-3 rounded-2xl flex items-center gap-4">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-lg shadow-lg glow-cyan">
+    <!-- Top HUD Header (Unified Compact Bar) -->
+    <header class="flex items-center justify-between gap-3 pointer-events-auto">
+      <!-- Left: Level Badge & Title -->
+      <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-sm shadow glow-cyan">
           <span id="level-num">1</span>
         </div>
         <div>
-          <h1 id="level-name" class="text-lg font-bold text-white tracking-wide">The First Hop</h1>
-          <p id="level-desc" class="text-xs text-slate-400">Jump Peg A over Peg B to reach the target.</p>
+          <h1 id="level-name" class="text-sm font-bold text-white tracking-wide leading-none mb-0.5">The First Hop</h1>
+          <p id="level-desc" class="text-[11px] text-slate-400 leading-none hidden sm:block">Jump Peg A over Peg B to reach the target.</p>
         </div>
       </div>
 
-      <!-- Stats & Badges -->
-      <div class="glass-panel px-5 py-3 rounded-2xl flex items-center gap-6 text-sm font-medium">
-        <!-- Target Badge -->
-        <div class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
-          <span class="text-slate-400">Target:</span>
-          <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">(2, 0)</span>
+      <!-- Center: Goal & Moves -->
+      <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-4 text-xs font-medium">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
+          <span class="text-slate-400 hidden sm:inline">Target:</span>
+          <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[11px]">(2, 0)</span>
         </div>
-        <div class="h-4 w-px bg-slate-700"></div>
-        <!-- Moves Counter -->
-        <div class="flex items-center gap-2">
+        <div class="h-3 w-px bg-slate-700"></div>
+        <div class="flex items-center gap-1.5">
           <span class="text-slate-400">Moves:</span>
           <span id="moves-count" class="font-mono-code text-cyan-300 font-bold">0</span>
-          <span class="text-slate-500 text-xs">/ Par <span id="par-moves">1</span></span>
+          <span class="text-slate-500 text-[10px]">/ <span id="par-moves">1</span></span>
         </div>
+      </div>
+
+      <!-- Right: Quick Actions + Hamburger Menu Button -->
+      <div class="flex items-center gap-2">
+        <button id="btn-undo" class="glass-button p-2.5 rounded-xl text-amber-400 flex items-center justify-center" title="Undo Move (Ctrl+Z)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+        </button>
+        <button id="btn-restart" class="glass-button p-2.5 rounded-xl text-rose-400 flex items-center justify-center" title="Restart Level (R)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        </button>
+        <button id="btn-menu" class="glass-button p-2.5 rounded-xl text-white flex items-center justify-center glow-cyan border-cyan-500/40" title="Open Menu">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
       </div>
     </header>
 
-    <!-- Center Aiming / Level Status Overlay (Dynamic tooltip) -->
-    <div id="hint-toast" class="self-center glass-panel px-4 py-2 rounded-full text-xs font-medium text-slate-300 transition-all opacity-90 pointer-events-auto flex items-center gap-2 shadow-lg">
-      <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 10 11-18 0 9 9 0 0118 0z"></path></svg>
-      <span id="hint-text">Click a peg to activate reflection jump trajectories.</span>
+    <div></div> <!-- Empty spacer -->
+  </div>
+
+  <!-- Slide-Over Navigation Menu Drawer -->
+  <div id="drawer-backdrop" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden transition-opacity duration-300">
+    <div id="menu-drawer" class="fixed top-0 right-0 h-full w-80 glass-panel border-l border-slate-700/60 p-6 flex flex-col justify-between shadow-2xl transform translate-x-full transition-transform duration-300 ease-out">
+      <div>
+        <!-- Drawer Header -->
+        <div class="flex items-center justify-between pb-5 mb-6 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-500 flex items-center justify-center text-slate-950 font-bold text-sm">❖</div>
+            <div>
+              <h2 class="font-bold text-white text-base">Game Menu</h2>
+              <p class="text-[10px] text-slate-400">3D Jumping Pegs Puzzle</p>
+            </div>
+          </div>
+          <button id="btn-close-drawer" class="p-1.5 text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <!-- Navigation Links / Controls -->
+        <div class="space-y-3">
+          <button id="drawer-btn-main-menu" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">🏠</span>
+            Main Title Screen
+          </button>
+          <button id="drawer-btn-levels" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">❖</span>
+            Select Level
+          </button>
+          <button id="drawer-btn-how-to" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">💡</span>
+            How to Play
+          </button>
+
+          <div class="h-px bg-slate-800 my-2"></div>
+
+          <button id="drawer-btn-restart" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-rose-500/20 text-rose-400">↺</span>
+            Restart Level <span class="ml-auto text-[10px] text-slate-500 font-mono">R</span>
+          </button>
+          <button id="drawer-btn-undo" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-amber-500/20 text-amber-400">↶</span>
+            Undo Move <span class="ml-auto text-[10px] text-slate-500 font-mono">Ctrl+Z</span>
+          </button>
+          <button id="drawer-btn-cam-reset" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-blue-500/20 text-blue-400">🎥</span>
+            Reset Isometric View
+          </button>
+          <button id="drawer-btn-mute" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
+            <span class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">🔊</span>
+            Toggle Audio
+          </button>
+        </div>
+      </div>
+
+      <!-- Drawer Footer / Shortcuts -->
+      <div class="pt-4 border-t border-slate-800/80 text-[11px] text-slate-500 space-y-1">
+        <p class="font-semibold text-slate-400 mb-1">Keyboard Shortcuts:</p>
+        <div class="flex justify-between"><span>Undo Move</span><span class="font-mono text-slate-400">Ctrl + Z</span></div>
+        <div class="flex justify-between"><span>Reset Level</span><span class="font-mono text-slate-400">R</span></div>
+        <div class="flex justify-between"><span>Cancel / Close</span><span class="font-mono text-slate-400">Esc</span></div>
+      </div>
     </div>
+  </div>
 
-    <!-- Bottom Controls Footer -->
-    <footer class="flex flex-wrap items-center justify-between gap-4 pointer-events-auto">
-      <!-- Left utilities -->
-      <div class="flex items-center gap-2">
-        <button id="btn-levels" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="Select Level">
-          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
-          Levels
+  <!-- Main Title / Hero Screen Overlay -->
+  <div id="main-menu" class="fixed inset-0 z-40 flex items-center justify-center p-6 bg-slate-950/70 backdrop-blur-md transition-opacity duration-500">
+    <div class="glass-panel w-full max-w-xl rounded-3xl p-8 md:p-10 text-center relative border border-cyan-500/30 shadow-2xl glow-cyan">
+      <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-tr from-cyan-500 via-emerald-500 to-indigo-500 flex items-center justify-center text-4xl shadow-xl">
+        ❖
+      </div>
+      <h1 class="text-3xl md:text-4xl font-extrabold text-white tracking-wider mb-2">3D JUMPING PEGS</h1>
+      <p class="text-xs md:text-sm text-cyan-300 font-medium mb-8 tracking-wide">Mathematical Point-Reflection Puzzle Engine</p>
+
+      <div class="space-y-3.5 max-w-xs mx-auto">
+        <button id="main-btn-play" class="w-full py-4 rounded-2xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 shadow-lg glow-emerald transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+          <span>▶</span> Start Playing
         </button>
-        <button id="btn-how-to" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="How to Play">
-          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 10 11-18 0 9 9 0 0118 0z"></path></svg>
-          How to Play
+        <button id="main-btn-levels" class="glass-button w-full py-3.5 rounded-2xl text-xs font-semibold text-slate-200 flex items-center justify-center gap-2">
+          <span>❖</span> Select Level
+        </button>
+        <button id="main-btn-how-to" class="glass-button w-full py-3.5 rounded-2xl text-xs font-semibold text-slate-200 flex items-center justify-center gap-2">
+          <span>💡</span> How to Play
         </button>
       </div>
 
-      <!-- Action buttons -->
-      <div class="flex items-center gap-2">
-        <button id="btn-undo" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="Undo Move (Ctrl+Z)">
-          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-          Undo <span class="text-[10px] text-slate-500 font-mono">Ctrl+Z</span>
-        </button>
-        <button id="btn-restart" class="glass-button px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-2" title="Restart Level (R)">
-          <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          Reset <span class="text-[10px] text-slate-500 font-mono">R</span>
-        </button>
-        <button id="btn-cam-reset" class="glass-button p-2.5 rounded-xl text-slate-300" title="Reset Camera View">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-        </button>
-        <button id="btn-mute" class="glass-button p-2.5 rounded-xl text-slate-300" title="Toggle Sound">
-          <svg id="icon-sound-on" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
-          <svg id="icon-sound-off" class="w-4 h-4 text-rose-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
-        </button>
+      <div class="mt-8 pt-6 border-t border-slate-800 text-[11px] text-slate-500 flex justify-around font-mono">
+        <span>MoMath Grid</span>
+        <span>•</span>
+        <span>Point Reflection C = 2B - A</span>
+        <span>•</span>
+        <span>Three.js 3D</span>
       </div>
-    </footer>
+    </div>
   </div>
 
   <!-- MODALS -->
@@ -309,7 +377,7 @@
       {
         id: 3,
         name: "Diagonal Inversion",
-        difficulty: "Medium",
+        difficulty: "Easy",
         description: "Use 2D diagonal reflection to shift axes and hit the goal.",
         parMoves: 2,
         pegs: [
@@ -323,7 +391,7 @@
       {
         id: 4,
         name: "Stepping Stones",
-        difficulty: "Medium-Hard",
+        difficulty: "Medium",
         description: "Bounce pegs back and forth to create a bridge across the board.",
         parMoves: 3,
         pegs: [
@@ -337,7 +405,7 @@
       {
         id: 5,
         name: "The Parity Lock",
-        difficulty: "Hard",
+        difficulty: "Medium",
         description: "Navigate a complex 3-peg cluster to reach the target parity spot.",
         parMoves: 4,
         pegs: [
@@ -347,6 +415,217 @@
         ],
         target: { x: 3, y: 4 },
         cameraPos: { x: 2, y: 14, z: 12 }
+      },
+      {
+        id: 6,
+        name: "Knight's Leap",
+        difficulty: "Medium",
+        description: "Combine orthogonal and diagonal steps to execute an oblique reflection.",
+        parMoves: 2,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 2 }
+        ],
+        target: { x: 2, y: 4 },
+        cameraPos: { x: 1, y: 10, z: 9 }
+      },
+      {
+        id: 7,
+        name: "Axis Pivot",
+        difficulty: "Medium",
+        description: "Pivot off a central node to invert horizontal coordinates.",
+        parMoves: 2,
+        pegs: [
+          { id: 'p1', x: -2, y: 0 },
+          { id: 'p2', x: 0, y: 0 }
+        ],
+        target: { x: 2, y: 0 },
+        cameraPos: { x: 0, y: 9, z: 7 }
+      },
+      {
+        id: 8,
+        name: "Triangle Reflection",
+        difficulty: "Medium-Hard",
+        description: "Reflect across triangular nodes to climb the vertical grid.",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 1 },
+          { id: 'p3', x: -1, y: 1 }
+        ],
+        target: { x: 0, y: 2 },
+        cameraPos: { x: 0, y: 10, z: 8 }
+      },
+      {
+        id: 9,
+        name: "The Quad Leap",
+        difficulty: "Hard",
+        description: "Chain multiple leapfrogs using 4 pegs across positive coordinates.",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 },
+          { id: 'p3', x: 2, y: 0 },
+          { id: 'p4', x: 3, y: 0 }
+        ],
+        target: { x: 6, y: 0 },
+        cameraPos: { x: 3, y: 12, z: 10 }
+      },
+      {
+        id: 10,
+        name: "Crossroads",
+        difficulty: "Hard",
+        description: "Navigate a cross formation to reach the corner target.",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 },
+          { id: 'p3', x: 0, y: 1 }
+        ],
+        target: { x: 2, y: -2 },
+        cameraPos: { x: 1, y: 11, z: 9 }
+      },
+      {
+        id: 11,
+        name: "The Staggered Chain",
+        difficulty: "Hard",
+        description: "Utilize offset pegs to step outside standard Cartesian lines.",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: -1, y: -1 },
+          { id: 'p2', x: 0, y: 0 },
+          { id: 'p3', x: 1, y: 1 }
+        ],
+        target: { x: 3, y: 3 },
+        cameraPos: { x: 1, y: 11, z: 9 }
+      },
+      {
+        id: 12,
+        name: "Mirror Lattice",
+        difficulty: "Hard",
+        description: "Mirror positions across both axes to land on target (4, 4).",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 1 },
+          { id: 'p3', x: 2, y: 2 }
+        ],
+        target: { x: 4, y: 4 },
+        cameraPos: { x: 2, y: 12, z: 10 }
+      },
+      {
+        id: 13,
+        name: "Subtle Shift",
+        difficulty: "Expert",
+        description: "Carefully reposition intermediate pegs before taking the final jump.",
+        parMoves: 4,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 },
+          { id: 'p3', x: 0, y: 2 }
+        ],
+        target: { x: 4, y: 0 },
+        cameraPos: { x: 2, y: 12, z: 10 }
+      },
+      {
+        id: 14,
+        name: "The Slalom",
+        difficulty: "Expert",
+        description: "Zig-zag through alternate coordinate quadrants to reach target (-2, 2).",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: 2, y: -2 },
+          { id: 'p2', x: 1, y: -1 },
+          { id: 'p3', x: 0, y: 0 }
+        ],
+        target: { x: -2, y: 2 },
+        cameraPos: { x: 0, y: 12, z: 10 }
+      },
+      {
+        id: 15,
+        name: "Orbiting Nodes",
+        difficulty: "Expert",
+        description: "Loop around central pivot points to generate high-distance leaps.",
+        parMoves: 4,
+        pegs: [
+          { id: 'p1', x: -1, y: 0 },
+          { id: 'p2', x: 0, y: 0 },
+          { id: 'p3', x: 1, y: 0 }
+        ],
+        target: { x: 5, y: 0 },
+        cameraPos: { x: 2, y: 13, z: 11 }
+      },
+      {
+        id: 16,
+        name: "Double Diagonal",
+        difficulty: "Master",
+        description: "Combine two diagonal reflections in sequence.",
+        parMoves: 3,
+        pegs: [
+          { id: 'p1', x: -2, y: -2 },
+          { id: 'p2', x: -1, y: -1 },
+          { id: 'p3', x: 0, y: 0 }
+        ],
+        target: { x: 2, y: 2 },
+        cameraPos: { x: 0, y: 12, z: 10 }
+      },
+      {
+        id: 17,
+        name: "The Parity Bridge",
+        difficulty: "Master",
+        description: "Bridge across odd and even lattice parity grids.",
+        parMoves: 4,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 1 },
+          { id: 'p3', x: 2, y: 0 }
+        ],
+        target: { x: 4, y: 2 },
+        cameraPos: { x: 2, y: 13, z: 11 }
+      },
+      {
+        id: 18,
+        name: "Geometric Inversion",
+        difficulty: "Master",
+        description: "Invert a 3-peg triangle to shoot outward toward target (5, 5).",
+        parMoves: 4,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 1 },
+          { id: 'p3', x: 2, y: 2 }
+        ],
+        target: { x: 5, y: 5 },
+        cameraPos: { x: 3, y: 14, z: 12 }
+      },
+      {
+        id: 19,
+        name: "Grand Relay",
+        difficulty: "Grandmaster",
+        description: "Perform a multi-stage distance chain using 4 pegs.",
+        parMoves: 4,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 0 },
+          { id: 'p3', x: 2, y: 0 },
+          { id: 'p4', x: 4, y: 0 }
+        ],
+        target: { x: 8, y: 0 },
+        cameraPos: { x: 4, y: 15, z: 13 }
+      },
+      {
+        id: 20,
+        name: "Point Reflection Master",
+        difficulty: "Grandmaster",
+        description: "The ultimate 2D point-reflection puzzle challenge.",
+        parMoves: 5,
+        pegs: [
+          { id: 'p1', x: 0, y: 0 },
+          { id: 'p2', x: 1, y: 1 },
+          { id: 'p3', x: 0, y: 2 },
+          { id: 'p4', x: 2, y: 0 }
+        ],
+        target: { x: 4, y: 4 },
+        cameraPos: { x: 2, y: 15, z: 13 }
       }
     ];
 
@@ -362,6 +641,7 @@
       selectedPeg: null,
       validMoves: [], // [{ pivot: pegObj, dest: {x, y} }]
       soundMuted: false,
+      isMainMenu: true,
       bestScores: JSON.parse(localStorage.getItem('3d_pegs_best') || '{}')
     };
 
@@ -967,14 +1247,53 @@
         }
       });
 
+      // Title Screen & Drawer Listeners
+      document.getElementById('main-btn-play').addEventListener('click', startPlaying);
+      document.getElementById('main-btn-levels').addEventListener('click', () => {
+        openLevelsModal();
+      });
+      document.getElementById('main-btn-how-to').addEventListener('click', () => {
+        openHowToModal();
+      });
+
+      document.getElementById('btn-menu').addEventListener('click', openDrawer);
+      document.getElementById('btn-close-drawer').addEventListener('click', closeDrawer);
+      document.getElementById('drawer-backdrop').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('drawer-backdrop')) closeDrawer();
+      });
+
+      document.getElementById('drawer-btn-main-menu').addEventListener('click', () => {
+        closeDrawer();
+        showMainMenu();
+      });
+      document.getElementById('drawer-btn-levels').addEventListener('click', () => {
+        closeDrawer();
+        openLevelsModal();
+      });
+      document.getElementById('drawer-btn-how-to').addEventListener('click', () => {
+        closeDrawer();
+        openHowToModal();
+      });
+      document.getElementById('drawer-btn-restart').addEventListener('click', () => {
+        closeDrawer();
+        restartLevel();
+      });
+      document.getElementById('drawer-btn-undo').addEventListener('click', () => {
+        closeDrawer();
+        undoMove();
+      });
+      document.getElementById('drawer-btn-cam-reset').addEventListener('click', () => {
+        closeDrawer();
+        resetCameraView();
+      });
+      document.getElementById('drawer-btn-mute').addEventListener('click', () => {
+        toggleMute();
+      });
+
       // UI Button Listeners
       document.getElementById('btn-undo').addEventListener('click', undoMove);
       document.getElementById('btn-restart').addEventListener('click', restartLevel);
-      document.getElementById('btn-cam-reset').addEventListener('click', resetCameraView);
-      document.getElementById('btn-mute').addEventListener('click', toggleMute);
-      document.getElementById('btn-levels').addEventListener('click', openLevelsModal);
       document.getElementById('btn-close-levels').addEventListener('click', closeAllModals);
-      document.getElementById('btn-how-to').addEventListener('click', openHowToModal);
       document.getElementById('btn-close-how-to').addEventListener('click', closeAllModals);
       document.getElementById('btn-replay').addEventListener('click', () => {
         closeAllModals();
@@ -1106,10 +1425,8 @@
 
       if (GameState.validMoves.length > 0) {
         renderJumpPreviews(peg, GameState.validMoves);
-        updateHintToast(`Aiming Mode: Click a yellow ring or pivot peg to jump (${GameState.validMoves.length} valid move${GameState.validMoves.length > 1 ? 's' : ''}).`);
       } else {
         playSoundError();
-        updateHintToast("No valid reflection jumps available for this peg!");
       }
     }
 
@@ -1122,7 +1439,6 @@
         GameState.selectedPeg = null;
         GameState.validMoves = [];
         clearPreviews();
-        updateHintToast("Click a peg to activate reflection jump trajectories.");
       }
     }
 
@@ -1143,8 +1459,6 @@
         // Check Win Condition
         if (checkWinCondition()) {
           onLevelCompleted();
-        } else {
-          updateHintToast("Jump executed! Select a peg for the next leap.");
         }
       });
     }
@@ -1171,7 +1485,6 @@
       deselectPeg();
       updateHUDStats();
       playSoundSelect();
-      updateHintToast("Undo performed.");
     }
 
     // --- 7. LEVEL MANAGEMENT & MODALS ---
@@ -1217,7 +1530,6 @@
 
       // Camera reset to level position
       resetCameraView();
-      updateHintToast("Level loaded. Select a peg to begin.");
     }
 
     function restartLevel() {
@@ -1236,10 +1548,6 @@
 
     function updateHUDStats() {
       document.getElementById('moves-count').textContent = GameState.movesCount;
-    }
-
-    function updateHintToast(msg) {
-      document.getElementById('hint-text').textContent = msg;
     }
 
     function onLevelCompleted() {
@@ -1327,11 +1635,42 @@
       document.getElementById('modal-levels').classList.remove('hidden');
     }
 
+    function startPlaying() {
+      GameState.isMainMenu = false;
+      document.getElementById('main-menu').classList.add('hidden');
+      resetCameraView();
+    }
+
+    function showMainMenu() {
+      GameState.isMainMenu = true;
+      closeAllModals();
+      document.getElementById('main-menu').classList.remove('hidden');
+    }
+
     function openHowToModal() {
       document.getElementById('modal-how-to').classList.remove('hidden');
     }
 
+    function openDrawer() {
+      const backdrop = document.getElementById('drawer-backdrop');
+      const drawer = document.getElementById('menu-drawer');
+      backdrop.classList.remove('hidden');
+      setTimeout(() => {
+        drawer.classList.remove('translate-x-full');
+      }, 10);
+    }
+
+    function closeDrawer() {
+      const backdrop = document.getElementById('drawer-backdrop');
+      const drawer = document.getElementById('menu-drawer');
+      drawer.classList.add('translate-x-full');
+      setTimeout(() => {
+        backdrop.classList.add('hidden');
+      }, 300);
+    }
+
     function closeAllModals() {
+      closeDrawer();
       document.getElementById('modal-levels').classList.add('hidden');
       document.getElementById('modal-how-to').classList.add('hidden');
       document.getElementById('modal-complete').classList.add('hidden');
@@ -1349,7 +1688,18 @@
         targetRingMesh.scale.setScalar(1.0 + 0.05 * Math.sin(time * 0.003));
       }
 
-      controls.update();
+      // Title screen ambient camera slow orbit
+      if (GameState.isMainMenu && camera) {
+        const radius = 12;
+        const speed = time * 0.0003;
+        camera.position.x = Math.sin(speed) * radius;
+        camera.position.z = Math.cos(speed) * radius;
+        camera.position.y = 10;
+        camera.lookAt(0, 0, 0);
+      } else {
+        controls.update();
+      }
+
       renderer.render(scene, camera);
     }
 
