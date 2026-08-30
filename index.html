@@ -95,45 +95,45 @@
   <div id="canvas-container"></div>
 
   <!-- Main Game UI Layer -->
-  <div class="relative z-10 flex flex-col justify-between h-full p-3 md:p-5 pointer-events-none">
+  <div class="relative z-10 flex flex-col justify-between h-full p-2.5 sm:p-4 pointer-events-none">
 
     <!-- Top HUD Header (Unified Compact Bar) -->
-    <header class="flex items-center justify-between gap-3 pointer-events-auto">
+    <header class="flex items-center justify-between gap-1.5 sm:gap-3 pointer-events-auto w-full max-w-full">
       <!-- Left: Level Badge & Title -->
-      <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-sm shadow glow-cyan">
+      <div class="glass-panel px-2.5 sm:px-3.5 py-2 rounded-2xl flex items-center gap-2 sm:gap-2.5 min-w-0 flex-shrink">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-xs sm:text-sm shadow glow-cyan flex-shrink-0">
           <span id="level-num">1</span>
         </div>
-        <div>
-          <h1 id="level-name" class="text-sm font-bold text-white tracking-wide leading-none mb-0.5">The First Hop</h1>
-          <p id="level-desc" class="text-[11px] text-slate-400 leading-none hidden sm:block">Jump Peg A over Peg B to reach the target.</p>
+        <div class="min-w-0">
+          <h1 id="level-name" class="text-xs sm:text-sm font-bold text-white tracking-wide leading-tight truncate max-w-[85px] sm:max-w-[160px]">The First Hop</h1>
+          <p id="level-desc" class="text-[11px] text-slate-400 leading-none hidden md:block truncate max-w-[200px]">Jump Peg A over Peg B to reach the target.</p>
         </div>
       </div>
 
       <!-- Center: Goal & Moves -->
-      <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-4 text-xs font-medium">
-        <div class="flex items-center gap-1.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
+      <div class="glass-panel px-2 sm:px-3.5 py-2 rounded-2xl flex items-center gap-2 sm:gap-3 text-xs font-medium flex-shrink-0">
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
           <span class="text-slate-400 hidden sm:inline">Target:</span>
-          <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[11px]">(2, 0)</span>
+          <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-500/30 text-[10px] sm:text-[11px]">(2, 0)</span>
         </div>
         <div class="h-3 w-px bg-slate-700"></div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-slate-400">Moves:</span>
-          <span id="moves-count" class="font-mono-code text-cyan-300 font-bold">0</span>
-          <span class="text-slate-500 text-[10px]">/ <span id="par-moves">1</span></span>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <span class="text-slate-400 text-[11px] sm:text-xs">Moves:</span>
+          <span id="moves-count" class="font-mono-code text-cyan-300 font-bold text-xs sm:text-sm">0</span>
+          <span class="text-slate-500 text-[10px]">/<span id="par-moves">1</span></span>
         </div>
       </div>
 
       <!-- Right: Quick Actions + Hamburger Menu Button -->
-      <div class="flex items-center gap-2">
-        <button id="btn-undo" class="glass-button p-2.5 rounded-xl text-amber-400 flex items-center justify-center" title="Undo Move (Ctrl+Z)">
+      <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-auto">
+        <button id="btn-undo" class="glass-button p-2 sm:p-2.5 rounded-xl text-amber-400 flex items-center justify-center" title="Undo Move (Ctrl+Z)">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
         </button>
-        <button id="btn-restart" class="glass-button p-2.5 rounded-xl text-rose-400 flex items-center justify-center" title="Restart Level (R)">
+        <button id="btn-restart" class="glass-button p-2 sm:p-2.5 rounded-xl text-rose-400 flex items-center justify-center" title="Restart Level (R)">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
         </button>
-        <button id="btn-menu" class="glass-button p-2.5 rounded-xl text-white flex items-center justify-center glow-cyan border-cyan-500/40" title="Open Menu">
+        <button id="btn-menu" class="glass-button p-2 sm:p-2.5 rounded-xl text-white flex items-center justify-center glow-cyan border-cyan-500/40" title="Open Menu">
           <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
       </div>
@@ -190,8 +190,8 @@
             Reset Isometric View
           </button>
           <button id="drawer-btn-mute" class="glass-button w-full p-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-slate-200">
-            <span class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">🔊</span>
-            Toggle Audio
+            <span id="drawer-mute-icon" class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">🔊</span>
+            <span id="drawer-mute-text">Mute Audio</span>
           </button>
         </div>
       </div>
@@ -828,8 +828,19 @@
 
     function toggleMute() {
       GameState.soundMuted = !GameState.soundMuted;
-      document.getElementById('icon-sound-on').classList.toggle('hidden', GameState.soundMuted);
-      document.getElementById('icon-sound-off').classList.toggle('hidden', !GameState.soundMuted);
+      const muteIcon = document.getElementById('drawer-mute-icon');
+      const muteText = document.getElementById('drawer-mute-text');
+      if (muteIcon) {
+        muteIcon.textContent = GameState.soundMuted ? '🔇' : '🔊';
+        muteIcon.className = GameState.soundMuted ? 'p-2 rounded-xl bg-rose-500/20 text-rose-400' : 'p-2 rounded-xl bg-emerald-500/20 text-emerald-400';
+      }
+      if (muteText) {
+        muteText.textContent = GameState.soundMuted ? 'Unmute Audio' : 'Mute Audio';
+      }
+      const soundOn = document.getElementById('icon-sound-on');
+      const soundOff = document.getElementById('icon-sound-off');
+      if (soundOn) soundOn.classList.toggle('hidden', GameState.soundMuted);
+      if (soundOff) soundOff.classList.toggle('hidden', !GameState.soundMuted);
     }
 
     // --- 4. THREE.JS 3D SCENE & GEOMETRY BUILDERS ---
@@ -994,7 +1005,7 @@
     }
 
     /**
-     * Constructs procedural 3D Pawn/Bulb Peg Mesh.
+     * Constructs procedural 3D Pawn/Bulb Peg Mesh with enlarged invisible touch hitbox.
      */
     function createPegMesh() {
       const pegGroup = new THREE.Group();
@@ -1022,6 +1033,16 @@
       headMesh.castShadow = true;
       headMesh.receiveShadow = true;
       pegGroup.add(headMesh);
+
+      // Invisible enlarged touch/raycast hit cylinder for high touch sensitivity
+      const hitGeo = new THREE.CylinderGeometry(0.65, 0.65, 1.4, 16);
+      const hitMat = new THREE.MeshBasicMaterial({
+        visible: false
+      });
+      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+      hitMesh.position.y = 0.6;
+      hitMesh.userData = { isHitbox: true };
+      pegGroup.add(hitMesh);
 
       // Custom property to reference group
       pegGroup.userData = { isPeg: true };
@@ -1132,6 +1153,17 @@
         ringMesh.position.set(move.dest.x, 0.008, move.dest.y);
         ringMesh.userData = { isTargetRing: true, moveData: move };
         previewGroup.add(ringMesh);
+
+        // Invisible enlarged hit disk for target landing circle (sensitive touch target)
+        const hitDiskGeo = new THREE.CircleGeometry(0.75, 32);
+        const hitDiskMat = new THREE.MeshBasicMaterial({
+          visible: false
+        });
+        const hitDiskMesh = new THREE.Mesh(hitDiskGeo, hitDiskMat);
+        hitDiskMesh.rotation.x = -Math.PI / 2;
+        hitDiskMesh.position.set(move.dest.x, 0.009, move.dest.y);
+        hitDiskMesh.userData = { isTargetRing: true, moveData: move };
+        previewGroup.add(hitDiskMesh);
       });
     }
 
@@ -1412,9 +1444,11 @@
       GameState.selectedPeg = peg;
       playSoundSelect();
 
-      // Highlight selected peg material
+      // Highlight selected peg material (exclude hitboxes)
       peg.mesh.traverse(child => {
-        if (child.isMesh) child.material = pegSelectedMaterial;
+        if (child.isMesh && (!child.userData || !child.userData.isHitbox)) {
+          child.material = pegSelectedMaterial;
+        }
       });
 
       // Lift peg position
@@ -1434,7 +1468,9 @@
       if (GameState.selectedPeg) {
         GameState.selectedPeg.mesh.position.y = 0;
         GameState.selectedPeg.mesh.traverse(child => {
-          if (child.isMesh) child.material = porcelainMaterial;
+          if (child.isMesh && (!child.userData || !child.userData.isHitbox)) {
+            child.material = porcelainMaterial;
+          }
         });
         GameState.selectedPeg = null;
         GameState.validMoves = [];
@@ -1448,7 +1484,9 @@
 
       // Reset peg material & elevation before jump animation starts
       pegA.mesh.traverse(child => {
-        if (child.isMesh) child.material = porcelainMaterial;
+        if (child.isMesh && (!child.userData || !child.userData.isHitbox)) {
+          child.material = porcelainMaterial;
+        }
       });
       GameState.selectedPeg = null;
 
