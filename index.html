@@ -2,7 +2,7 @@
 <html lang="en" class="h-full select-none">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>3D Jumping Pegs - Mathematical Puzzle Game</title>
 
   <!-- Tailwind CSS CDN -->
@@ -30,6 +30,7 @@
       padding: 0;
       width: 100vw;
       height: 100vh;
+      touch-action: none;
     }
 
     .font-mono-code {
@@ -38,7 +39,7 @@
 
     /* Glassmorphism styling */
     .glass-panel {
-      background: rgba(15, 23, 42, 0.75);
+      background: rgba(15, 23, 42, 0.78);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -71,6 +72,9 @@
     .glow-amber {
       box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
     }
+    .glow-rose {
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+    }
 
     /* Canvas overlay */
     #canvas-container {
@@ -81,6 +85,16 @@
       left: 0;
       z-index: 0;
     }
+
+    /* Shake animation for invalid turn */
+    @keyframes subtle-shake {
+      0%, 100% { transform: translate(-50%, 0); }
+      20%, 60% { transform: translate(calc(-50% - 6px), 0); }
+      40%, 80% { transform: translate(calc(-50% + 6px), 0); }
+    }
+    .animate-shake {
+      animation: subtle-shake 0.4s ease-in-out;
+    }
   </style>
 </head>
 <body class="relative h-full w-full overflow-hidden select-none">
@@ -88,67 +102,84 @@
   <!-- 3D Canvas Container -->
   <div id="canvas-container"></div>
 
-  <!-- Main Game UI Layer -->
-  <div class="relative z-10 flex flex-col justify-between h-full p-2.5 sm:p-4 pointer-events-none">
+  <!-- Custom Floating Turn Toast Notification -->
+  <div id="turn-toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-2.5 rounded-2xl border border-amber-500/60 shadow-2xl glow-amber flex items-center gap-3 transition-all duration-300 opacity-0 pointer-events-none -translate-y-4">
+    <div class="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center text-sm flex-shrink-0">
+      ⏳
+    </div>
+    <div>
+      <p id="turn-toast-msg" class="text-xs font-bold text-amber-200">Opponent's Turn</p>
+      <p class="text-[10px] text-slate-300">Please wait for your turn to make a move.</p>
+    </div>
+  </div>
 
-    <!-- Multiplayer Banner Status Bar -->
-    <div id="mp-hud-banner" class="hidden pointer-events-auto w-full max-w-md mx-auto mb-2 glass-panel px-4 py-2 rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-lg glow-emerald">
-      <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <div>
-          <span id="mp-room-code-badge" class="font-mono text-xs font-bold text-emerald-300">ROOM: ------</span>
-          <p id="mp-opponent-status" class="text-[10px] text-slate-300 truncate max-w-[140px]">vs Opponent</p>
+  <!-- Main Game UI Layer (Pinned strictly to Top & Bottom) -->
+  <div class="fixed inset-0 z-10 flex flex-col justify-between p-2.5 sm:p-4 pointer-events-none">
+
+    <!-- Top Pinned Bar Container (Holds Banner + HUD together) -->
+    <div class="w-full max-w-4xl mx-auto flex flex-col gap-2 pointer-events-auto">
+
+      <!-- Multiplayer Banner Status Bar -->
+      <div id="mp-hud-banner" class="hidden w-full glass-panel px-3.5 py-1.5 rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-lg glow-emerald">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+          <div class="min-w-0">
+            <span id="mp-room-code-badge" class="font-mono text-xs font-bold text-emerald-300">ROOM: ------</span>
+            <p id="mp-opponent-status" class="text-[10px] text-slate-300 truncate max-w-[120px] sm:max-w-[200px]">vs Opponent</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div id="mp-turn-badge" class="px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-bold text-cyan-300">
+            Your Turn
+          </div>
+          <button id="btn-leave-room" class="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs border border-rose-500/30 transition-colors">✕ Leave</button>
         </div>
       </div>
-      <div id="mp-turn-badge" class="px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-bold text-cyan-300">
-        Your Turn
-      </div>
-      <button id="btn-leave-room" class="p-1 text-slate-400 hover:text-rose-400 text-xs transition-colors">✕ Leave</button>
+
+      <!-- Top HUD Header -->
+      <header class="flex items-center justify-between gap-1.5 sm:gap-3 w-full">
+        <!-- Left: Level Badge & Title -->
+        <div class="glass-panel px-2.5 sm:px-3.5 py-2 rounded-2xl flex items-center gap-2 sm:gap-2.5 min-w-0 flex-shrink">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-xs sm:text-sm shadow glow-cyan flex-shrink-0">
+            <span id="level-num">1</span>
+          </div>
+          <div class="min-w-0">
+            <h1 id="level-name" class="text-xs sm:text-sm font-bold text-white tracking-wide leading-tight truncate max-w-[85px] sm:max-w-[160px]">The First Hop</h1>
+            <p id="level-desc" class="text-[11px] text-slate-400 leading-none hidden md:block truncate max-w-[200px]">Jump Peg A over Peg B to reach the target.</p>
+          </div>
+        </div>
+
+        <!-- Center: Goal & Moves -->
+        <div class="glass-panel px-2.5 sm:px-3.5 py-2 rounded-2xl flex items-center gap-2 sm:gap-3 text-xs font-medium flex-shrink-0">
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
+            <span class="text-slate-400 hidden sm:inline">Target:</span>
+            <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[10px] sm:text-[11px]">(2, 0)</span>
+          </div>
+          <div class="h-3 w-px bg-slate-700"></div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <span class="text-slate-400 text-[11px] sm:text-xs">Moves:</span>
+            <span id="moves-count" class="font-mono-code text-cyan-300 font-bold text-xs sm:text-sm">0</span>
+            <span class="text-slate-500 text-[10px]">/<span id="par-moves">1</span></span>
+          </div>
+        </div>
+
+        <!-- Right: Quick Actions + Menu Button -->
+        <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-auto">
+          <button id="btn-undo" class="glass-button p-2 sm:p-2.5 rounded-xl text-amber-400 flex items-center justify-center" title="Undo Move (Ctrl+Z)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+          </button>
+          <button id="btn-restart" class="glass-button p-2 sm:p-2.5 rounded-xl text-rose-400 flex items-center justify-center" title="Restart Level (R)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          </button>
+          <button id="btn-menu" class="glass-button p-2 sm:p-2.5 rounded-xl text-white flex items-center justify-center glow-cyan border-cyan-500/40" title="Open Menu">
+            <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+        </div>
+      </header>
     </div>
 
-    <!-- Top HUD Header -->
-    <header class="flex items-center justify-between gap-1.5 sm:gap-3 pointer-events-auto w-full max-w-full">
-      <!-- Left: Level Badge & Title -->
-      <div class="glass-panel px-2.5 sm:px-3.5 py-2 rounded-2xl flex items-center gap-2 sm:gap-2.5 min-w-0 flex-shrink">
-        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center font-bold text-slate-900 text-xs sm:text-sm shadow glow-cyan flex-shrink-0">
-          <span id="level-num">1</span>
-        </div>
-        <div class="min-w-0">
-          <h1 id="level-name" class="text-xs sm:text-sm font-bold text-white tracking-wide leading-tight truncate max-w-[85px] sm:max-w-[160px]">The First Hop</h1>
-          <p id="level-desc" class="text-[11px] text-slate-400 leading-none hidden md:block truncate max-w-[200px]">Jump Peg A over Peg B to reach the target.</p>
-        </div>
-      </div>
-
-      <!-- Center: Goal & Moves -->
-      <div class="glass-panel px-2 sm:px-3.5 py-2 rounded-2xl flex items-center gap-2 sm:gap-3 text-xs font-medium flex-shrink-0">
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse glow-emerald"></span>
-          <span class="text-slate-400 hidden sm:inline">Target:</span>
-          <span id="target-coord" class="font-mono-code text-emerald-300 font-bold bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-500/30 text-[10px] sm:text-[11px]">(2, 0)</span>
-        </div>
-        <div class="h-3 w-px bg-slate-700"></div>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <span class="text-slate-400 text-[11px] sm:text-xs">Moves:</span>
-          <span id="moves-count" class="font-mono-code text-cyan-300 font-bold text-xs sm:text-sm">0</span>
-          <span class="text-slate-500 text-[10px]">/<span id="par-moves">1</span></span>
-        </div>
-      </div>
-
-      <!-- Right: Quick Actions + Menu Button -->
-      <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-auto">
-        <button id="btn-undo" class="glass-button p-2 sm:p-2.5 rounded-xl text-amber-400 flex items-center justify-center" title="Undo Move (Ctrl+Z)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-        </button>
-        <button id="btn-restart" class="glass-button p-2 sm:p-2.5 rounded-xl text-rose-400 flex items-center justify-center" title="Restart Level (R)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-        </button>
-        <button id="btn-menu" class="glass-button p-2 sm:p-2.5 rounded-xl text-white flex items-center justify-center glow-cyan border-cyan-500/40" title="Open Menu">
-          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        </button>
-      </div>
-    </header>
-
-    <div></div>
+    <div></div> <!-- Empty spacer for bottom -->
   </div>
 
   <!-- Slide-Over Navigation Menu Drawer -->
@@ -246,7 +277,7 @@
           <span>▶</span> Start Playing
         </button>
 
-        <!-- Multiplayer & Friends Button (Placed Right Below Start Playing) -->
+        <!-- Multiplayer & Friends Button -->
         <button id="main-btn-multiplayer" class="glass-button w-full py-3.5 rounded-2xl text-xs font-bold text-emerald-300 border-emerald-500/40 glow-emerald flex items-center justify-center gap-2 hover:border-emerald-400">
           <span>⚔️</span> Multiplayer & Friends
         </button>
@@ -287,7 +318,7 @@
     </div>
   </div>
 
-  <!-- Multiplayer Modal (Create, Join & Friends List) -->
+  <!-- Multiplayer Modal -->
   <div id="modal-multiplayer" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-300">
     <div class="glass-panel w-full max-w-lg rounded-3xl p-6 relative border border-slate-700/50 shadow-2xl">
       <button id="btn-close-multiplayer" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
@@ -330,9 +361,7 @@
 
       <!-- Tab Content: Friends List -->
       <div id="content-mp-friends" class="space-y-3 hidden">
-        <div id="friends-list-container" class="max-h-60 overflow-y-auto space-y-2.5 pr-1">
-          <!-- Dynamic Friends Items -->
-        </div>
+        <div id="friends-list-container" class="max-h-60 overflow-y-auto space-y-2.5 pr-1"></div>
       </div>
     </div>
   </div>
@@ -361,11 +390,9 @@
         <span id="lobby-status-text">Waiting for opponent to connect...</span>
       </div>
 
-      <div class="flex items-center gap-3">
-        <button id="btn-close-lobby" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors">
-          Enter Game View
-        </button>
-      </div>
+      <button id="btn-close-lobby" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors">
+        Enter Game View
+      </button>
     </div>
   </div>
 
@@ -380,9 +407,7 @@
       </h2>
       <p class="text-sm text-slate-400 mb-6">Choose a puzzle level to solve. Track your par efficiency.</p>
 
-      <div id="levels-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
-        <!-- Dynamic Level Cards -->
-      </div>
+      <div id="levels-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1"></div>
     </div>
   </div>
 
@@ -449,7 +474,7 @@
         <span class="text-amber-400 filter drop-shadow">★</span>
       </div>
 
-      <div class="bg-slate-900/70 rounded-2xl p-4 mb-6 border border-slate-800 text-xs flex justify-around">
+      <div class="bg-slate-900/70 rounded-2xl p-4 mb-4 border border-slate-800 text-xs flex justify-around">
         <div>
           <span class="block text-slate-400 mb-1">Your Moves</span>
           <span id="complete-moves" class="font-mono text-lg font-bold text-cyan-400">1</span>
@@ -460,6 +485,8 @@
           <span id="complete-par" class="font-mono text-lg font-bold text-slate-300">1</span>
         </div>
       </div>
+
+      <p id="mp-sync-note" class="text-[11px] text-emerald-400 mb-4 hidden">⚡ Multiplayer: Clicking Next Level syncs both players instantly!</p>
 
       <div class="flex items-center gap-3">
         <button id="btn-replay" class="glass-button flex-1 py-3 rounded-xl text-xs font-semibold text-slate-200">
@@ -667,7 +694,6 @@
           firebase.initializeApp(firebaseConfig);
         }
 
-        // Anonymous auth sign-in for seamless Firebase security rule compliance
         if (firebase.auth) {
           firebase.auth().signInAnonymously().then((userCred) => {
             if (userCred && userCred.user) {
@@ -724,7 +750,26 @@
       }
     }
 
-    // --- MULTIPLAYER ROOM CREATION & JOINING LOGIC ---
+    // --- CUSTOM TOAST NOTIFICATION (REPLACES BROWSER ALERT) ---
+    let toastTimeout = null;
+    function showTurnNotification(customMsg) {
+      const toast = document.getElementById('turn-toast');
+      const msgEl = document.getElementById('turn-toast-msg');
+      if (customMsg && msgEl) msgEl.textContent = customMsg;
+
+      toast.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-4');
+      toast.classList.add('animate-shake');
+
+      playSoundError();
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('animate-shake');
+        toast.classList.add('opacity-0', 'pointer-events-none', '-translate-y-4');
+      }, 1800);
+    }
+
+    // --- MULTIPLAYER ROOM LOGIC & AUTOMATIC NEXT LEVEL SYNC ---
     function generateRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let code = '';
@@ -738,7 +783,7 @@
 
     function createMultiplayerRoom(levelId = 1) {
       if (!db) {
-        alert("Firebase initializing... Please check your internet connection.");
+        showTurnNotification("Firebase connecting... Please check internet.");
         return;
       }
 
@@ -784,7 +829,7 @@
         })
         .catch((err) => {
           console.error("Room Creation Error:", err);
-          alert("Firebase Permission Notice: Please verify that Realtime Database Rules allow read/write (.read: true, .write: true) in Firebase Console.");
+          showTurnNotification("Database Error: Check Firebase rules.");
         });
     }
 
@@ -802,13 +847,13 @@
       const targetRoomRef = db.ref(`/rooms/${cleanCode}`);
       targetRoomRef.once('value').then((snap) => {
         if (!snap.exists()) {
-          alert('Room code not found. Please verify code.');
+          showTurnNotification('Room code not found!');
           return;
         }
 
         const roomData = snap.val();
         if (roomData.guest && roomData.guest.uid !== localPlayer.uid) {
-          alert('Room is already full.');
+          showTurnNotification('Room is already full!');
           return;
         }
 
@@ -837,7 +882,7 @@
         startPlaying();
       }).catch((err) => {
         console.error(err);
-        alert("Failed to join room. Please check database permissions.");
+        showTurnNotification("Failed to join room.");
       });
     }
 
@@ -866,7 +911,7 @@
       hideMultiplayerRoomUI();
     }
 
-    // --- REAL-TIME MOVE SYNC ---
+    // --- REAL-TIME MULTIPLAYER LISTENER & AUTO-SYNC ---
     function listenToRoomEvents(code) {
       if (!roomRef) return;
 
@@ -893,11 +938,12 @@
         }
       });
 
+      // Synchronize Moves, Undo, Restart, and NEXT LEVEL automatically for BOTH players
       roomRef.child('lastAction').on('value', (snap) => {
         const action = snap.val();
-        if (!action || !action.by || action.by === localPlayer.uid) return;
+        if (!action) return;
 
-        if (action.type === 'JUMP') {
+        if (action.type === 'JUMP' && action.by !== localPlayer.uid) {
           const pegObj = GameState.pegs.find(p => p.id === action.pegId);
           const pivotObj = GameState.pegs.find(p => p.id === action.pivotId);
           if (pegObj && pivotObj) {
@@ -912,12 +958,23 @@
               }
             });
           }
-        } else if (action.type === 'UNDO') {
+        } else if (action.type === 'UNDO' && action.by !== localPlayer.uid) {
           if (GameState.history.length > 0) {
             undoMoveLocalOnly();
             GameState.multiplayer.currentTurn = action.nextTurn;
             updateMultiplayerHUD();
           }
+        } else if (action.type === 'NEXT_LEVEL') {
+          // Automatic level sync for both players
+          closeAllModals();
+          loadLevel(action.levelId);
+          GameState.multiplayer.currentTurn = 'host';
+          updateMultiplayerHUD();
+        } else if (action.type === 'RESTART') {
+          closeAllModals();
+          loadLevel(action.levelId);
+          GameState.multiplayer.currentTurn = 'host';
+          updateMultiplayerHUD();
         }
       });
 
@@ -950,6 +1007,36 @@
         }
       });
       updateMultiplayerHUD();
+    }
+
+    function sendMultiplayerNextLevel(nextLevelId) {
+      if (!GameState.multiplayer.active || !roomRef) return;
+
+      roomRef.update({
+        levelId: nextLevelId,
+        currentTurn: 'host',
+        lastAction: {
+          type: 'NEXT_LEVEL',
+          by: localPlayer.uid,
+          levelId: nextLevelId,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        }
+      });
+    }
+
+    function sendMultiplayerRestart(levelId) {
+      if (!GameState.multiplayer.active || !roomRef) return;
+
+      roomRef.update({
+        levelId: levelId,
+        currentTurn: 'host',
+        lastAction: {
+          type: 'RESTART',
+          by: localPlayer.uid,
+          levelId: levelId,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        }
+      });
     }
 
     function addFriend(friendUid, friendName) {
@@ -1045,7 +1132,7 @@
         const isMyTurn = GameState.multiplayer.currentTurn === GameState.multiplayer.playerRole;
         turnBadge.textContent = isMyTurn ? 'Your Turn' : "Opponent's Turn";
         turnBadge.className = isMyTurn
-          ? 'px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-bold text-cyan-300'
+          ? 'px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-[11px] font-bold text-cyan-300 shadow glow-cyan'
           : 'px-2.5 py-1 rounded-xl bg-amber-950/80 border border-amber-500/40 text-[11px] font-bold text-amber-300';
       }
     }
@@ -1238,9 +1325,9 @@
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(140, audioCtx.currentTime);
       osc.frequency.linearRampToValueAtTime(90, audioCtx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -1587,7 +1674,7 @@
       document.getElementById('btn-copy-code').addEventListener('click', () => {
         const code = document.getElementById('lobby-room-code').textContent;
         navigator.clipboard.writeText(code).then(() => {
-          alert(`Room code ${code} copied to clipboard!`);
+          showTurnNotification(`Room code ${code} copied!`);
         });
       });
       document.getElementById('btn-close-lobby').addEventListener('click', () => {
@@ -1640,17 +1727,22 @@
         }
       });
 
+      // Synchronized Replay / Next Level Action Handlers
       document.getElementById('btn-replay').addEventListener('click', () => {
         closeAllModals();
-        restartLevel();
+        if (GameState.multiplayer.active) {
+          sendMultiplayerRestart(GameState.currentLevel);
+        }
+        loadLevel(GameState.currentLevel);
       });
+
       document.getElementById('btn-next-level').addEventListener('click', () => {
         closeAllModals();
-        if (GameState.currentLevel < LEVELS.length) {
-          loadLevel(GameState.currentLevel + 1);
-        } else {
-          loadLevel(1);
+        const nextLvl = GameState.currentLevel < LEVELS.length ? GameState.currentLevel + 1 : 1;
+        if (GameState.multiplayer.active) {
+          sendMultiplayerNextLevel(nextLvl);
         }
+        loadLevel(nextLvl);
       });
     }
 
@@ -1706,6 +1798,16 @@
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
+
+      // Check if it's opponent's turn in multiplayer
+      if (GameState.multiplayer.active && GameState.multiplayer.currentTurn !== GameState.multiplayer.playerRole) {
+        const pegMeshes = GameState.pegs.map(p => p.mesh);
+        const intersects = raycaster.intersectObjects(pegMeshes, true);
+        if (intersects.length > 0) {
+          showTurnNotification("Opponent's Turn! Please wait...");
+          return;
+        }
+      }
 
       const previewIntersects = raycaster.intersectObjects(previewGroup.children, true);
       const targetRingHit = previewIntersects.find(i => i.object.userData && i.object.userData.isTargetRing);
@@ -1780,8 +1882,7 @@
 
     function executeJump(pegA, pivotB, destC) {
       if (GameState.multiplayer.active && GameState.multiplayer.currentTurn !== GameState.multiplayer.playerRole) {
-        playSoundError();
-        alert("It's your opponent's turn!");
+        showTurnNotification("Opponent's Turn! Please wait...");
         deselectPeg();
         return;
       }
@@ -1835,6 +1936,11 @@
         return;
       }
 
+      if (GameState.multiplayer.active && GameState.multiplayer.currentTurn !== GameState.multiplayer.playerRole) {
+        showTurnNotification("Opponent's Turn!");
+        return;
+      }
+
       undoMoveLocalOnly();
       playSoundSelect();
     }
@@ -1876,6 +1982,9 @@
 
     function restartLevel() {
       if (GameState.isAnimating) return;
+      if (GameState.multiplayer.active) {
+        sendMultiplayerRestart(GameState.currentLevel);
+      }
       loadLevel(GameState.currentLevel);
     }
 
@@ -1916,6 +2025,11 @@
       document.getElementById('complete-level-title').textContent = `Level ${levelId}: ${LEVELS.find(l => l.id === levelId).name}`;
       document.getElementById('complete-moves').textContent = currentMoves;
       document.getElementById('complete-par').textContent = par;
+
+      const mpNote = document.getElementById('mp-sync-note');
+      if (mpNote) {
+        mpNote.classList.toggle('hidden', !GameState.multiplayer.active);
+      }
 
       const starsContainer = document.getElementById('complete-stars');
       starsContainer.innerHTML = '';
